@@ -1,11 +1,17 @@
 classdef Trajectory_viewer < handle
     
+    properties (Constant)
+        settings_file = 'settings.mat'
+    end
+    
     properties (SetAccess = immutable, GetAccess = private)
         gui;
     end
     
     properties (SetAccess = private)
         deleted;
+        settings;
+        connected;
     end
     
     
@@ -19,6 +25,18 @@ classdef Trajectory_viewer < handle
             cat_params = parse_categories(parser.Unmatched, {'gui'});
             cat_params.gui.DeleteFcn = @obj.delete;
             obj.gui = Gui(cat_params.gui);
+            obj.connected = false;
+            if exist(obj.settings_file, 'file') == 2
+                load(obj.settings_file, 'settings');
+                obj.settings = settings;
+            else
+                obj.settings = struct();
+            end
+            if ~isfield(obj.settings, 'connection')
+                obj.settings.connection = '';
+            end
+            set(obj.gui.h_connection, 'String', obj.settings.connection);
+            set(obj.gui.h_connect_btn, 'Callback', @(src, event)connect(obj));
         end
         
         function delete(obj)
@@ -26,9 +44,25 @@ classdef Trajectory_viewer < handle
                 return
             end
             obj.deleted = true;
+            if obj.connected
+                obj.connect()
+            end
+            settings = obj.settings;
+            save(obj.settings_file, 'settings');
             if ~obj.gui.deleted
                 obj.gui.delete();
             end
+        end
+        
+        %% modifiers
+        function connect(obj)
+            if obj.connected
+                obj.connected = false;
+            else
+                obj.connected = true;
+                obj.settings.connection = get(obj.gui.h_connection, 'String');
+            end
+            obj.gui.connection_sig(obj.connected);
         end
     end
 end

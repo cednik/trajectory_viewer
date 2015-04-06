@@ -7,8 +7,10 @@ classdef Gui < handle
     properties (SetAccess = immutable)
         h_fig;
             h_axes_panel;
+                h_axes;
             h_control_panel;
                 h_connect_btn;
+                h_connection;
         h_deleted_notifee;
     end
     
@@ -26,8 +28,8 @@ classdef Gui < handle
             addOptional(parser, 'Position', 'stored', @check_option_position)
             parse(parser, varargin{:});
             obj.h_deleted_notifee = parser.Results.DeleteFcn;
-            if exist(Gui.settings_file, 'file') == 2
-                load(Gui.settings_file, 'settings');
+            if exist(obj.settings_file, 'file') == 2
+                load(obj.settings_file, 'settings');
                 obj.settings = settings;
             else
                 obj.settings = struct();
@@ -49,16 +51,25 @@ classdef Gui < handle
             obj.h_axes_panel = uipanel(obj.h_fig, ...
                 'Title', '', ...
                 'Units', 'pixels', ...
-                'BorderType', 'none', ...
-                'BackgroundColor', 'c');
+                'BorderType', 'none');
+            obj.h_axes = axes('Parent', obj.h_axes_panel, ...
+                'XGrid', 'on', ...
+                'YGrid', 'on', ...
+                'ZGrid', 'on');
             obj.h_control_panel = uipanel(obj.h_fig, ...
                 'Title', '', ...
                 'Units', 'pixels', ...
-                'BorderType', 'none', ...
-                'BackgroundColor', 'm');
+                'BorderType', 'none');
             obj.h_connect_btn = uicontrol(obj.h_control_panel, ...
                 'Style', 'pushbutton', ...
                 'String', 'Connect');
+            pos = get(obj.h_connect_btn, 'Extent');
+            set(obj.h_connect_btn, 'Position', [pos(3) / 4, pos(4) / 3, pos(3) * 1.5, pos(4)]);
+            obj.h_connection = uicontrol(obj.h_control_panel, ...
+                'Style', 'edit', ...
+                'HorizontalAlignment', 'left', ...
+                'BackgroundColor', 'white', ...
+                'Position', [pos(3) * 2, pos(4) / 3, pos(3) * 4, pos(4)]);
             set(obj.h_fig, 'Visible', 'on');
         end
         
@@ -68,10 +79,21 @@ classdef Gui < handle
             end
             obj.deleted = true;
             settings = obj.settings;
-            save(Gui.settings_file, 'settings');
+            save(obj.settings_file, 'settings');
             obj.h_deleted_notifee();
             if ishandle(obj.h_fig)
                 close(obj.h_fig);
+            end
+        end
+        
+        %% modifiers
+        function connection_sig(obj, connected)
+            if connected
+                set(obj.h_connect_btn, 'String', 'Disconnect');
+                set(obj.h_connection, 'Enable', 'off');
+            else
+                set(obj.h_connect_btn, 'String', 'Connect');
+                set(obj.h_connection, 'Enable', 'on');
             end
         end
     end
@@ -80,13 +102,12 @@ classdef Gui < handle
     methods (Access = private)
         %% callbacks
         function obj = resize(obj)
+            control_height = get(obj.h_connect_btn, 'Extent');
+            control_height = control_height(4) * 1.5;
             fig_pos = get(obj.h_fig, 'Position');
-            control_width = get(obj.h_connect_btn, 'Extent');
-            width = control_width(3) * 1.21;
-            set(obj.h_axes_panel, 'Position', [0, 0, fig_pos(3) - width, fig_pos(4)]);
-            set(obj.h_control_panel, 'Position', [fig_pos(3) - width, 0, width, fig_pos(4)]);
-            set(obj.h_connect_btn, 'Position', [(width - control_width(3)) / 2, ...
-                control_width(4)*2, control_width(3), control_width(4)]);
+            set(obj.h_axes_panel, 'Position', [0, 0, fig_pos(3), fig_pos(4) - control_height]);
+            set(obj.h_control_panel, 'Position', ...
+                [0, fig_pos(4) - control_height, fig_pos(3), control_height]);
             obj.settings.figure_position = get(obj.h_fig, 'OuterPosition');
         end
     end
