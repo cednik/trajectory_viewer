@@ -4,7 +4,7 @@ classdef Trajectory_viewer < handle
         settings_file = 'settings.mat'
     end
     
-    properties (SetAccess = immutable, GetAccess = private)
+    properties (SetAccess = immutable)%, GetAccess = private)
         gui;
     end
     
@@ -12,6 +12,8 @@ classdef Trajectory_viewer < handle
         deleted;
         settings;
         connected;
+        trajectory;
+        robot;
     end
     
     
@@ -23,6 +25,8 @@ classdef Trajectory_viewer < handle
             parser.KeepUnmatched = true;
             parse(parser, varargin{:});
             cat_params = parse_categories(parser.Unmatched, {'gui'});
+            obj.trajectory = struct('X', [], 'Y', [], 'Z', [], 't', []);
+            obj.robot = struct('X', 0, 'Y', 0, 'Z', 0, 'roll', 0, 'pitch', 0, 'yaw', 0);
             cat_params.gui.DeleteFcn = @obj.delete;
             obj.gui = Gui(cat_params.gui);
             obj.connected = false;
@@ -59,8 +63,8 @@ classdef Trajectory_viewer < handle
             if obj.connected
                 obj.connected = false;
             else
-                obj.connected = true;
                 obj.settings.connection = get(obj.gui.h_connection, 'String');
+                obj.connected = true;
             end
             obj.gui.connection_sig(obj.connected);
         end
