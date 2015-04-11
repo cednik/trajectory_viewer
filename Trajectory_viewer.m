@@ -2,7 +2,7 @@ classdef Trajectory_viewer < handle
     
     properties (Constant)
         settings_file = 'settings.mat';
-        init_alloc_size = 2^20;
+        init_alloc_size = 72000; % 1 Hour @ 20 Hz input
         
     end
     
@@ -15,7 +15,6 @@ classdef Trajectory_viewer < handle
         settings;
         connected;
         trajectory;
-        robot;
     end
     
     
@@ -27,11 +26,13 @@ classdef Trajectory_viewer < handle
             parser.KeepUnmatched = true;
             parse(parser, varargin{:});
             cat_params = parse_categories(parser.Unmatched, {'gui'});
-            obj.trajectory = struct('coor', NaN(obj.init_alloc_size, 3), 'length', 1);
-            obj.trajectory.coor(1, :) = [0 0 0];
-            obj.robot = struct('X', 0, 'Y', 0, 'Z', 0, 'roll', 0, 'pitch', 0, 'yaw', 0);
+            obj.trajectory.coor = NaN(obj.init_alloc_size, 6);
+            obj.trajectory.time = cell(obj.init_alloc_size, 1);
+            obj.trajectory.length = 1;
+            obj.trajectory.updated = true;
+            obj.trajectory.coor(1, :) = zeros(1, size(obj.trajectory.coor, 2));
             cat_params.gui.DeleteFcn = @obj.delete;
-            obj.gui = Gui(cat_params.gui);
+            obj.gui = Gui(@()get_trajectory(obj), cat_params.gui);
             obj.connected = false;
             if exist(obj.settings_file, 'file') == 2
                 load(obj.settings_file, 'settings');
@@ -56,6 +57,7 @@ classdef Trajectory_viewer < handle
             end
             settings = obj.settings;
             save(obj.settings_file, 'settings');
+            %clear(obj.trajectory);
             if ~obj.gui.deleted
                 obj.gui.delete();
             end
@@ -72,37 +74,70 @@ classdef Trajectory_viewer < handle
             obj.gui.connection_sig(obj.connected);
         end
         
-        function add_point(obj, coor, absolute, robot_orientation)
-            if length(coor) < 3
-                coor = [coor, 0];
+        function add_point(obj, coor, absolute, time)
+            if nargin < 4
+                time = clock();
+                if nargin < 3
+                    absolute = false;
+                end
             end
-            if size(obj.trajectory.coor, 1) == obj.trajectory.length
-                obj.trajectory.coor = [obj.trajectory.coor; Nan(size(obj.trajectory.coor))];
+            if size(obj.trajectory.coor, 1) == obj.trajectory.length %% realloc if full
+                obj.trajectory.coor = [obj.trajectory.coor; NaN(size(obj.trajectory.coor))];
+                obj.trajectory.time = {obj.trajectory.time; cell(size(obj.trajectory.time))};
             end
             obj.trajectory.length = obj.trajectory.length + 1;
-            if ~(nargin < 3 || absolute)
-                coor = coor + obj.trajectory.coor(obj.trajectory.length - 1, :);
+            if length(coor) == 2
+                coor = [coor, 0];
             end
-            obj.trajectory.coor(obj.trajectory.length, :) = coor;
-            if nargin < 4 || isempty(robot_orientation)
-                l = obj.trajectory.length;
-                pitch = atan2(0, diff(obj.trajectory.coor(l-1:l, 3)));
-                yaw = atan2(diff(obj.trajectory.coor(l-1:l, 2)), ...
-                    diff(obj.trajectory.coor(l-1:l, 1)));
-                robot_orientation = struct('roll', 0, 'pitch', pitch, 'yaw', yaw);
+            abs_rot = absolute;
+            if length(coor) == 3
+                abs_rot = true;
+                if absolute
+                    [r p y] = calc_orientation(obj);
+                else
+                    [r p y] = calc_orientation(obj, coor);
+                end
+                coor = [coor, r, p, y];
+            elseif length(coor) ~= size(obj.trajectory.coor, 2)
+                coor = [coor, zeros(1, size(obj.trajectory.coor, 2) - length(coor))];
             end
-            obj.robot.X = coor(1);
-            obj.robot.Y = coor(2);
-            obj.robot.Z = coor(3);
-            obj.robot.roll = robot_orientation.roll;
-            obj.robot.pitch = robot_orientation.pitch;
-            obj.robot.yaw = robot_orientation.yaw;
-            set(obj.gui.h_trajectory, ...
-                'XData', obj.trajectory.coor(1:obj.trajectory.length, 1), ...
-                'YData', obj.trajectory.coor(1:obj.trajectory.length, 2), ...
-                'ZData', obj.trajectory.coor(1:obj.trajectory.length, 3));
-            obj.gui.set_robot_position(obj.robot);
-            drawnow;
+            if absolute
+                obj.trajectory.coor(obj.trajectory.length, :) = coor;
+            else
+                if abs_rot
+                    obj.trajectory.coor(obj.trajectory.length, 1:3) = ...
+                        coor(1:3) + obj.trajectory.coor(obj.trajectory.length - 1, 1:3);
+                    obj.trajectory.coor(obj.trajectory.length, 4:6) = coor(4:6);
+                else
+                    obj.trajectory.coor(obj.trajectory.length, :) = ...
+                        coor + obj.trajectory.coor(obj.trajectory.length - 1, :);
+                end
+            end
+            obj.trajectory.time{obj.trajectory.length} = time;
+            obj.trajectory.updated = true;
+        end
+    
+        function t = get_trajectory(obj, force)
+            if obj.trajectory.updated || (nargin > 1 && force)
+                t = obj.trajectory.coor(1:obj.trajectory.length, :);
+                obj.trajectory.updated = false;
+            else
+                t = false;
+            end
+        end
+        
+        function [r p y] = calc_orientation(obj, dif)
+            l = obj.trajectory.length;
+            if nargin == 1 || isempty(dif)
+                dif = diff(obj.trajectory.coor(l-1:l, 1:3));
+            end
+            r = 0;
+            p = atan2(sqrt(sum(dif(1:2).^2)), dif(3)) - pi/2;
+            if dif(1) == 0 && dif(2) == 0
+                y = obj.trajectory.coor(l-1, 6);
+            else
+                y = atan2(dif(2), dif(1));
+            end
         end
     end
 end
