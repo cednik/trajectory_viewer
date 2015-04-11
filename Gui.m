@@ -13,6 +13,7 @@ classdef Gui < handle
                 h_connection;
             h_status_panel;
                 h_fps;
+                h_message;
         h_deleted_notifee;
         h_refresh_timer;
         h_trajectory_getter;
@@ -93,6 +94,10 @@ classdef Gui < handle
                 'String', fps2str(0, 0));
             pos = get(obj.h_fps, 'Extent');
             set(obj.h_fps, 'Position', [20, pos(4) / 3, pos(3) * 1.5, pos(4)]);
+            obj.h_message = uicontrol(obj.h_status_panel, ...
+                'Style', 'text', ...
+                'HorizontalAlignment', 'left', ...
+                'String', 'Ready');
             obj.h_axes_panel = uipanel(obj.h_fig, ...
                 'Title', '', ...
                 'Units', 'pixels', ...
@@ -147,6 +152,10 @@ classdef Gui < handle
             end
         end
         
+        function set_message(obj, message)
+            set(obj.h_message, 'String', message);
+        end
+        
         function set_robot_position(obj, position)
             if obj.robot.is_vector
                 dimension = {'XData', 'YData', 'ZData'};
@@ -184,6 +193,8 @@ classdef Gui < handle
             control_height = get(obj.h_connect_btn, 'Extent');
             control_height = control_height(4) * 1.5;
             status_height = get(obj.h_fps, 'Extent');
+            fps_width = status_height(3);
+            status_texts_height = status_height(4);
             status_height = status_height(4) * 1.5;
             fig_pos = get(obj.h_fig, 'Position');
             set(obj.h_axes_panel, 'Position', ...
@@ -192,6 +203,8 @@ classdef Gui < handle
                 [0, fig_pos(4) - control_height, fig_pos(3), control_height]);
             set(obj.h_status_panel, 'Position', ...
                 [0, 0, fig_pos(3), status_height]);
+            set(obj.h_message, 'Position', [fps_width + fig_pos(3) / 20, status_texts_height/3, ...
+                fig_pos(3) - fps_width - fig_pos(3) / 20, status_texts_height]);
             obj.settings.figure_position = get(obj.h_fig, 'OuterPosition');
             
         end
