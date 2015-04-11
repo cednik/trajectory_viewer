@@ -14,6 +14,7 @@ classdef Trajectory_viewer < handle
         deleted;
         settings;
         connected;
+        connection;
         trajectory;
     end
     
@@ -66,10 +67,39 @@ classdef Trajectory_viewer < handle
         %% modifiers
         function connect(obj)
             if obj.connected
+                fclose(obj.connection);
+                set_message(obj.gui, 'Disconnected');
                 obj.connected = false;
             else
                 obj.settings.connection = get(obj.gui.h_connection, 'String');
-                obj.connected = true;
+                if ~isempty(obj.connection) && ~ischar(obj.connection)
+                    delete(obj.connection);
+                end
+                try
+                    % FIX-ME should write my own parser, because security
+                    obj.connection = eval(obj.settings.connection);
+                    if ischar(obj.connection)
+                        obj.connection = fopen(obj.connection);
+                    else
+                        fopen(obj.connection);
+                    end
+                    set_message(obj.gui, 'Connected');
+                    obj.connected = true;
+                catch ME
+                    switch ME.identifier
+                        case 'MATLAB:UndefinedFunction'
+                            beep;
+                            errordlg(['Incorrect expression "', obj.settings.connection, ...
+                                '" in connection input row!'], 'Incorrect expresion', 'modal');
+                        case 'instrument:fopen:opfailed'
+                            set_message(obj.gui, 'Can not open connection!');
+                            beep;
+                        otherwise
+                            set_message(obj.gui, ...
+                                ['Exception "', ME.identifier, '" occured during connection']);
+                            beep;
+                    end
+                end
             end
             obj.gui.connection_sig(obj.connected);
         end
