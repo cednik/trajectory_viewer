@@ -18,6 +18,7 @@ classdef Gui < handle
         deleted;
         settings;
         robot;
+        h_trajectory;
     end
     
     methods
@@ -28,6 +29,7 @@ classdef Gui < handle
             addOptional(parser, 'DeleteFcn', @()0, @(h)isa(h, 'function_handle'));
             addOptional(parser, 'Position', 'stored', @check_option_position);
             addOptional(parser, 'Robot', []); % FIX-ME add checking
+            addOptional(parser, 'RobotSize', 0, @(v)isnumeric(v) && v(1) > 0 && v(1) <= 1);
             parse(parser, varargin{:});
             obj.h_deleted_notifee = parser.Results.DeleteFcn;
             if exist(obj.settings_file, 'file') == 2
@@ -35,6 +37,11 @@ classdef Gui < handle
                 obj.settings = settings;
             else
                 obj.settings = struct();
+            end
+            if parser.Results.RobotSize ~= 0
+                obj.settings.RobotSize = parser.Results.RobotSize;
+            elseif ~isfield(obj.settings, 'RobotSize')
+                obj.settings.RobotSize = 0.1;
             end
             figure_options = struct(...
                 'name', 'Trajectory viewer', ...
@@ -79,10 +86,12 @@ classdef Gui < handle
             xlabel(obj.h_axes, 'X');
             ylabel(obj.h_axes, 'Y');
             zlabel(obj.h_axes, 'Z');
+            axis(obj.h_axes, 'equal');
             plot3(obj.h_axes, [0 1], [0 0], [0 0], 'r', 'LineWidth', 2);
             plot3(obj.h_axes, [0 0], [0 1], [0 0], 'g', 'LineWidth', 2);
             plot3(obj.h_axes, [0 0], [0 0], [0 1], 'b', 'LineWidth', 2);
             obj.robot = init_robot(obj.h_axes, parser.Results.Robot);
+            obj.h_trajectory = plot3(obj.h_axes, nan, nan, nan, 'm');
         end
         
         function delete(obj)
@@ -115,23 +124,24 @@ classdef Gui < handle
                 r = position.roll;
                 p = position.pitch;
                 y = position.yaw;
-                c = @(x) cos(x);
-                s = @(x) sin(x);
                 H = zeros(4);
-                H(1:3, 1:3) = [ c(y)*c(r), -s(y)*c(p)+c(y)*s(r)*s(p),  s(y)*s(p)+c(y)*s(r)*c(p); ...
-                                s(y)*c(r),  c(y)*c(p)+s(y)*s(r)*s(p), -c(y)*s(p)+s(y)*s(r)*c(p); ...
-                               -s(y)     ,  c(y)*s(p)               ,  c(y)*c(p)              ];
+                H(1:3, 1:3) = ...
+    [ cos(y)*cos(r), -sin(y)*cos(p)+cos(y)*sin(r)*sin(p),  sin(y)*sin(p)+cos(y)*sin(r)*cos(p); ...
+      sin(y)*cos(r),  cos(y)*cos(p)+sin(y)*sin(r)*sin(p), -cos(y)*sin(p)+sin(y)*sin(r)*cos(p); ...
+     -sin(y)       ,  cos(y)*sin(p)                     ,  cos(y)*cos(p)                    ];
                 for i = 1:3
                     H(i, 4) = position.(dimension{i});
                     dimension{i} = [dimension{i} 'Data'];
                 end
-                H(4, 4) = position.size;
+                H(4, 4) = 1;
+                lim = axis(obj.h_axes);
+                scale = max(diff(reshape(lim, 2, length(lim) / 2))) * obj.settings.RobotSize;
                 for i = 1:numel(obj.robot.handle)
                     h = obj.robot.handle(i);
-                    values = obj.robot.symbol{i};
+                    values = obj.robot.symbol{i} .* scale;
                     for j = 1:size(values, 1)
                         new = H * [values(j, :) 1]';
-                        values(j, :) = new(1:3) .* new(4);
+                        values(j, :) = new(1:3);
                     end
                     for k = 1:3
                         set(h, dimension{k}, values(:, k));
@@ -181,9 +191,9 @@ end
 function robot = init_robot(parent, symbol)
     if isempty(symbol)
         symbol = cell(2, 1);
-        symbol{1} = [0 -1 0; -0.5 -1 0; 0 1 0; 0.5 -1 0; 0 -1 0; 0 1 0];
-        symbol{1}(:, 2) = symbol{1}(:, 2) + 1/3;
-        symbol{2} = [-0.1 0 0; 0.1 0 0];
+        symbol{1} = [-1 0 0; -1 -0.5 0; 1 0 0; -1 0.5 0; -1 0 0; 1 0 0];
+        symbol{1}(:, 1) = symbol{1}(:, 1) + 1/3;
+        symbol{2} = [0 -0.1 0; 0 0.1 0];
     end
     if iscell(symbol)
         robot.is_vector = true;
