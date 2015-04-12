@@ -8,6 +8,7 @@ classdef Trajectory_viewer < handle
     
     properties (SetAccess = immutable)%, GetAccess = private)
         gui;
+        com_parser;
     end
     
     properties (SetAccess = private)
@@ -21,7 +22,7 @@ classdef Trajectory_viewer < handle
     
     methods
         %% Ctor, Dtor
-        function obj = Trajectory_viewer(varargin)
+        function obj = Trajectory_viewer(com_parser, varargin)
             obj.deleted = false;
             parser = inputParser;
             parser.KeepUnmatched = true;
@@ -32,8 +33,13 @@ classdef Trajectory_viewer < handle
             obj.trajectory.length = 1;
             obj.trajectory.updated = true;
             obj.trajectory.coor(1, :) = zeros(1, size(obj.trajectory.coor, 2));
+            obj.trajectory.time{1} = clock();
             cat_params.gui.DeleteFcn = @obj.delete;
             obj.gui = Gui(@()get_trajectory(obj), cat_params.gui);
+            obj.com_parser = com_parser;
+            if isobject(obj.com_parser)
+                set_plot_fcn(obj.com_parser, @obj.add_point);
+            end
             obj.connected = false;
             if exist(obj.settings_file, 'file') == 2
                 load(obj.settings_file, 'settings');
@@ -54,13 +60,19 @@ classdef Trajectory_viewer < handle
             end
             obj.deleted = true;
             if obj.connected
-                obj.connect()
+                connect(obj)
+            end
+            if isobject(obj.connection)
+                delete(obj.connection);
             end
             settings = obj.settings;
             save(obj.settings_file, 'settings');
             %clear(obj.trajectory);
             if ~obj.gui.deleted
-                obj.gui.delete();
+                delete(obj.gui);
+            end
+            if isobject(obj.com_parser)
+                delete(obj.com_parser);
             end
         end
         
@@ -72,17 +84,27 @@ classdef Trajectory_viewer < handle
                 obj.connected = false;
             else
                 obj.settings.connection = get(obj.gui.h_connection, 'String');
-                if ~isempty(obj.connection) && ~ischar(obj.connection)
+                if ~isempty(obj.connection)
                     delete(obj.connection);
                 end
                 try
                     % FIX-ME should write my own parser, because security
                     obj.connection = eval(obj.settings.connection);
-                    if ischar(obj.connection)
-                        obj.connection = fopen(obj.connection);
+                    if isobject(obj.com_parser)
+                        datacallback = ...
+                            @(src, event)obj.com_parser.process(obj.connection);
                     else
-                        fopen(obj.connection);
+                        datacallback = @(src, event)obj.com_parser(obj.connection, @obj.add_point);
                     end
+                    if isa(obj.connection, 'udp')
+                        set(obj.connection, 'DatagramReceivedFcn', datacallback);
+                    else
+                        set(obj.connection, ...
+                            'BytesAvailableFcnCount', 1, ...
+                            'BytesAvailableFcnMode', 'byte', ...
+                            'BytesAvailableFcn', datacallback);
+                    end
+                    fopen(obj.connection);
                     set_message(obj.gui, 'Connected');
                     obj.connected = true;
                 catch ME
@@ -134,6 +156,9 @@ classdef Trajectory_viewer < handle
             if absolute
                 obj.trajectory.coor(obj.trajectory.length, :) = coor;
             else
+                if ~any(coor)
+                    return;
+                end
                 if abs_rot
                     obj.trajectory.coor(obj.trajectory.length, 1:3) = ...
                         coor(1:3) + obj.trajectory.coor(obj.trajectory.length - 1, 1:3);
