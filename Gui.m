@@ -14,6 +14,7 @@ classdef Gui < handle
             h_status_panel;
                 h_fps;
                 h_message;
+                h_robot_info;
         h_deleted_notifee;
         h_refresh_timer;
         h_trajectory_getter;
@@ -34,7 +35,8 @@ classdef Gui < handle
             addOptional(parser, 'DeleteFcn', @()0, @(h)isa(h, 'function_handle'));
             addOptional(parser, 'Position', 'stored', @check_option_position);
             addOptional(parser, 'Robot', []); % FIX-ME add checking
-            addOptional(parser, 'RobotSize', 0, @(v)isnumeric(v) && v(1) > 0 && v(1) <= 1);
+            addOptional(parser, 'RobotSize', 0, @(v)isnumeric(v) && v >= 0);
+            addOptional(parser, 'MinRobotSize', 0, @(v)isnumeric(v) && v > 0 && v <= 1);
             addOptional(parser, 'Fps', 0, @(v)isnumeric(v) && v(1) > 0 && v(1) <= 1000);
             parse(parser, varargin{:});
             obj.h_deleted_notifee = parser.Results.DeleteFcn;
@@ -48,7 +50,12 @@ classdef Gui < handle
             if parser.Results.RobotSize ~= 0
                 obj.settings.RobotSize = parser.Results.RobotSize;
             elseif ~isfield(obj.settings, 'RobotSize')
-                obj.settings.RobotSize = 0.1;
+                obj.settings.RobotSize = 0;
+            end
+            if parser.Results.MinRobotSize ~= 0
+                obj.settings.MinRobotSize = parser.Results.MinRobotSize;
+            elseif ~isfield(obj.settings, 'MinRobotSize')
+                obj.settings.MinRobotSize = 0.1;
             end
             if parser.Results.Fps ~= 0
                 obj.settings.Fps = parser.Results.Fps;
@@ -100,6 +107,11 @@ classdef Gui < handle
                 'FontName', 'FixedWidth', ...
                 'HorizontalAlignment', 'left', ...
                 'String', 'Ready');
+            obj.h_robot_info = uicontrol(obj.h_status_panel, ...
+                'Style', 'text', ...
+                'FontName', 'FixedWidth', ...
+                'HorizontalAlignment', 'left', ...
+                'String', '');
             obj.h_axes_panel = uipanel(obj.h_fig, ...
                 'Title', '', ...
                 'Units', 'pixels', ...
@@ -171,7 +183,18 @@ classdef Gui < handle
            -sin(p),                       cos(p)*sin(r),                       cos(p)*cos(r)];
                 H(:, 4) = [position(1:3)'; 1];
                 lim = axis(obj.h_axes);
-                scale = max(diff(reshape(lim, 2, length(lim) / 2))) * obj.settings.RobotSize;
+                max_axis = max(diff(reshape(lim, 2, length(lim) / 2))) / 2;
+                if (obj.settings.RobotSize / max_axis) < obj.settings.MinRobotSize
+                    scale = max_axis * obj.settings.MinRobotSize;
+                else
+                    scale = obj.settings.RobotSize;
+                end
+                if obj.settings.RobotSize == 0
+                    show_scale = 1;
+                else
+                    show_scale = scale / obj.settings.RobotSize;
+                end
+                set(obj.h_robot_info, 'String', robot_info(position, show_scale));
                 for i = 1:numel(obj.robot.handle)
                     h = obj.robot.handle(i);
                     values = obj.robot.symbol{i} .* scale;
@@ -197,7 +220,7 @@ classdef Gui < handle
             status_height = get(obj.h_fps, 'Extent');
             fps_width = status_height(3);
             status_texts_height = status_height(4);
-            status_height = status_height(4) * 1.5;
+            status_height = status_height(4) * 2.5;
             fig_pos = get(obj.h_fig, 'Position');
             set(obj.h_axes_panel, 'Position', ...
                 [0, status_height, fig_pos(3), fig_pos(4) - control_height - status_height]);
@@ -207,6 +230,8 @@ classdef Gui < handle
                 [0, 0, fig_pos(3), status_height]);
             set(obj.h_message, 'Position', [fps_width + fig_pos(3) / 20, status_texts_height/3, ...
                 fig_pos(3) - fps_width - fig_pos(3) / 20, status_texts_height]);
+            set(obj.h_robot_info, 'Position', [20, status_texts_height*5/3, ...
+                fig_pos(3), status_texts_height]);
             obj.settings.figure_position = get(obj.h_fig, 'OuterPosition');
             
         end
@@ -305,4 +330,15 @@ end
 
 function s = fps2str(current, average)
     s = sprintf('fps: %6.2f (avg %5.2f)', 1 / current, 1 / average);
+end
+
+function s = robot_info(coor, scale)
+    rpy = round(rad2deg(coor(4:6)));
+    s = sprintf(...
+        'Robot: coordinates = [X: %s; Y: %s; Z: %s; R: %4d; P: %4d; Y: %4d] scale = %7.3f', ...
+        coor2str(coor(1)), coor2str(coor(2)), coor2str(coor(3)), rpy(1), rpy(2), rpy(3), scale);
+end
+
+function s = coor2str(coor)
+    s = num2str(coor, 4);
 end
