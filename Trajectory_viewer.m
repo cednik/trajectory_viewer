@@ -137,7 +137,6 @@ classdef Trajectory_viewer < handle
                 obj.trajectory.coor = [obj.trajectory.coor; NaN(size(obj.trajectory.coor))];
                 obj.trajectory.time = {obj.trajectory.time; cell(size(obj.trajectory.time))};
             end
-            obj.trajectory.length = obj.trajectory.length + 1;
             if length(coor) == 2
                 coor = [coor, 0];
             end
@@ -154,11 +153,13 @@ classdef Trajectory_viewer < handle
                 coor = [coor, zeros(1, size(obj.trajectory.coor, 2) - length(coor))];
             end
             if absolute
+                obj.trajectory.length = obj.trajectory.length + 1;
                 obj.trajectory.coor(obj.trajectory.length, :) = coor;
             else
                 if ~any(coor)
                     return;
                 end
+                obj.trajectory.length = obj.trajectory.length + 1;
                 if abs_rot
                     obj.trajectory.coor(obj.trajectory.length, 1:3) = ...
                         coor(1:3) + obj.trajectory.coor(obj.trajectory.length - 1, 1:3);
