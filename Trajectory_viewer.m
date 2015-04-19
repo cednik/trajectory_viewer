@@ -17,6 +17,7 @@ classdef Trajectory_viewer < handle
         connected;
         connection;
         trajectory;
+        
     end
     
     
@@ -28,12 +29,7 @@ classdef Trajectory_viewer < handle
             parser.KeepUnmatched = true;
             parse(parser, varargin{:});
             cat_params = parse_categories(parser.Unmatched, {'gui'});
-            obj.trajectory.coor = NaN(obj.init_alloc_size, 6);
-            obj.trajectory.time = cell(obj.init_alloc_size, 1);
-            obj.trajectory.length = 1;
-            obj.trajectory.updated = true;
-            obj.trajectory.coor(1, :) = zeros(1, size(obj.trajectory.coor, 2));
-            obj.trajectory.time{1} = clock();
+            obj.trajectory = create_trajectory(obj.init_alloc_size);
             cat_params.gui.DeleteFcn = @obj.delete;
             obj.gui = Gui(@()get_trajectory(obj), cat_params.gui);
             obj.com_parser = com_parser;
@@ -52,6 +48,7 @@ classdef Trajectory_viewer < handle
             end
             set(obj.gui.h_connection, 'String', obj.settings.connection);
             set(obj.gui.h_connect_btn, 'Callback', @(src, event)connect(obj));
+            set(obj.gui.h_clear_btn, 'Callback', @(src, event)clear(obj));
         end
         
         function delete(obj)
@@ -126,7 +123,7 @@ classdef Trajectory_viewer < handle
             obj.gui.connection_sig(obj.connected);
         end
         
-        function add_point(obj, coor, absolute, time)
+        function [robot_coor] = add_point(obj, coor, absolute, time)
             if nargin < 4
                 time = clock();
                 if nargin < 3
@@ -155,8 +152,10 @@ classdef Trajectory_viewer < handle
             if absolute
                 obj.trajectory.length = obj.trajectory.length + 1;
                 obj.trajectory.coor(obj.trajectory.length, :) = coor;
+                robot_coor = coor;
             else
                 if ~any(coor)
+                    robot_coor = obj.trajectory.coor(obj.trajectory.length, :);
                     return;
                 end
                 obj.trajectory.length = obj.trajectory.length + 1;
@@ -166,8 +165,9 @@ classdef Trajectory_viewer < handle
                     obj.trajectory.coor(obj.trajectory.length, 4:6) = coor(4:6);
                 else
                     obj.trajectory.coor(obj.trajectory.length, :) = ...
-                        coor + obj.trajectory.coor(obj.trajectory.length - 1, :);
+                        obj.trajectory.coor(obj.trajectory.length - 1, :) + coor;
                 end
+                robot_coor = obj.trajectory.coor(obj.trajectory.length, :);
             end
             obj.trajectory.time{obj.trajectory.length} = time;
             obj.trajectory.updated = true;
@@ -195,6 +195,15 @@ classdef Trajectory_viewer < handle
                 y = atan2(dif(2), dif(1));
             end
         end
+        
+        function clear(obj)
+            obj.trajectory = create_trajectory(obj.init_alloc_size);
+            if isobject(obj.com_parser)
+                clear(obj.com_parser);
+            else
+                obj.com_parser('clear');
+            end
+        end
     end
 end
 
@@ -211,6 +220,25 @@ function res = parse_categories(params, categories)
                     names{n}(pos(1) + length(categories{c}) + 1 : end)) = params.(names{n});
                 break;
             end
+        end
+    end
+end
+
+function t = create_trajectory(len, first)
+    t.coor = NaN(len, 6);
+    t.time = cell(len, 1);
+    t.length = 1;
+    t.updated = true;
+    if nargin < 2
+        t.coor(1, :) = zeros(1, size(t.coor, 2));
+        t.time{1} = clock();
+    else
+        if iscell(first)
+            t.coor(1, :) = first{1};
+            t.time{1} = first{2};
+        else
+            t.coor(1, :) = first;
+            t.time{1} = clock();
         end
     end
 end

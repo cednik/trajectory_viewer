@@ -28,6 +28,7 @@ classdef Avakars_parser < handle
         
         function clear(obj)
             obj.state = 0;
+            obj.robot_model_fcn('clear');
         end
         
         function process(obj, com)
@@ -47,7 +48,7 @@ classdef Avakars_parser < handle
                         obj.cmd = bitshift(bitand(byte, uint8(240)), -4);
                         obj.len = bitand(byte, uint8(15));
                         if obj.len == 0
-                            cmd_dispatch(obj);
+                            cmd_dispatch(obj, com);
                         else
                             obj.state = 2;
                         end
@@ -55,27 +56,32 @@ classdef Avakars_parser < handle
                         obj.state = obj.state + 1;
                         obj.data(obj.state - 2) = byte;
                         if obj.state >= (obj.len + 2)
-                            cmd_dispatch(obj);
+                            cmd_dispatch(obj, com);
                         end
                 end
             end
         end
         
-        function cmd_dispatch(obj)
+        function cmd_dispatch(obj, com)
             obj.state = 0;
             switch obj.cmd
                 case 2
-                    process_encoders(obj);
+                    process_encoders(obj, com);
             end
         end
         
-        function process_encoders(obj)
+        function process_encoders(obj, com)
             if obj.len ~= 8
                 warning('AvakarsParser:TooFewBytes', ...
                     'Too few bytes for encoders received (only %d, should by 8)', obj.len);
                 return;
             end
-            obj.plot_fcn(obj.robot_model_fcn(typecast(obj.data(1:8), 'int32')));
+            coor = obj.plot_fcn(obj.robot_model_fcn(typecast(obj.data(1:8), 'int32')));
+%             fwrite(com, sprintf('%10d; %10d; %3d\n', ...
+%                 round(coor(1)), round(coor(2)), round(rad2deg(coor(6)))));
+            [lat, lon] = geodreckon(49.2797622, -16.6879011, ...
+                pdist([0 0; coor(1:2)]), rad2deg(atan2(coor(2), coor(1))));
+            fwrite(com, sprintf('%4.8f; %4.8f, %3d\n', lat, lon, round(rad2deg(coor(6)))));
         end
     end
 end

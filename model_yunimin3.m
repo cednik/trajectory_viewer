@@ -4,9 +4,16 @@ function coor = model_yunimin3(enc)
     wheel_diameter = 68.7; % mm
     wheels_distance = 95; % mm
     
+    persistent last_enc phi;
+    
+    if ischar(enc) && strcmpi(enc, 'clear')
+        last_enc = [];
+        coor = [];
+        return;
+    end
+    
     enc = double(enc) * pi * wheel_diameter / ecn_tick_per_rev;
     
-    persistent last_enc phi;
     if isempty(last_enc)
         last_enc = enc;
         phi = 0;
