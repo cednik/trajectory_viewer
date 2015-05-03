@@ -13,10 +13,10 @@ function [s12, azi1, azi2, S12, m12, M12, M21, a12] = geoddistance ...
 %   The ellipsoid vector is of the form [a, e], where a is the equatorial
 %   radius in meters, e is the eccentricity.  If ellipsoid is omitted, the
 %   WGS84 ellipsoid (more precisely, the value returned by
-%   DEFAULTELLIPSOID) is used.  The output s12 is the distance in meters
+%   defaultellipsoid) is used.  The output s12 is the distance in meters
 %   and azi1 and azi2 are the forward azimuths at the end points in
 %   degrees.  The other optional outputs, S12, m12, M12, M21, a12 are
-%   documented in GEODDOC.  GEODDOC also gives the restrictions on the
+%   documented in geoddoc.  geoddoc also gives the restrictions on the
 %   allowed ranges of the arguments.
 %
 %   When given a combination of scalar and array inputs, the scalar inputs
@@ -26,10 +26,10 @@ function [s12, azi1, azi2, S12, m12, M12, M21, a12] = geoddistance ...
 %
 %     C. F. F. Karney, Algorithms for geodesics,
 %     J. Geodesy 87, 43-55 (2013);
-%     http://dx.doi.org/10.1007/s00190-012-0578-z
+%     https://dx.doi.org/10.1007/s00190-012-0578-z
 %     Addenda: http://geographiclib.sf.net/geod-addenda.html
 %
-%   This function duplicates some of the functionality of the DISTANCE
+%   This function duplicates some of the functionality of the distance
 %   function in the MATLAB mapping toolbox.  Differences are
 %
 %     * When the ellipsoid argument is omitted, use the WGS84 ellipsoid.
@@ -42,9 +42,9 @@ function [s12, azi1, azi2, S12, m12, M12, M21, a12] = geoddistance ...
 %   See also GEODDOC, GEODRECKON, GEODAREA, GEODESICINVERSE,
 %     DEFAULTELLIPSOID.
 
-% Copyright (c) Charles Karney (2012, 2013) <charles@karney.com>.
+% Copyright (c) Charles Karney (2012-2015) <charles@karney.com>.
 %
-% This file was distributed with GeographicLib 1.31.
+% This file was distributed with GeographicLib 1.42.
 %
 % This is a straightforward transcription of the C++ implementation in
 % GeographicLib and the C++ source should be consulted for additional
@@ -53,21 +53,20 @@ function [s12, azi1, azi2, S12, m12, M12, M21, a12] = geoddistance ...
 % with scalar arguments.  The biggest change was to eliminate the branching
 % to allow a vectorized solution.
 
-  if nargin < 4, error('Too few input arguments'), end
+  narginchk(4, 5)
   if nargin < 5, ellipsoid = defaultellipsoid; end
   try
-    Z = lat1 + lon1 + lat2 + lon2;
-    S = size(Z);
-    Z = zeros(S);
-    lat1 = lat1 + Z; lon1 = lon1 + Z;
-    lat2 = lat2 + Z; lon2 = lon2 + Z;
-    Z = Z(:);
-  catch err
+    S = size(lat1 + lon1 + lat2 + lon2);
+  catch
     error('lat1, lon1, s12, azi1 have incompatible sizes')
   end
   if length(ellipsoid(:)) ~= 2
     error('ellipsoid must be a vector of size 2')
   end
+  Z = zeros(S);
+  lat1 = lat1 + Z; lon1 = lon1 + Z;
+  lat2 = lat2 + Z; lon2 = lon2 + Z;
+  Z = Z(:);
 
   degree = pi/180;
   tiny = sqrt(realmin);
@@ -107,11 +106,11 @@ function [s12, azi1, azi2, S12, m12, M12, M21, a12] = geoddistance ...
 
   phi = lat1 * degree;
   sbet1 = f1 * sin(phi); cbet1 = cos(phi); cbet1(lat1 == -90) = tiny;
-  [sbet1, cbet1] = SinCosNorm(sbet1, cbet1);
+  [sbet1, cbet1] = norm2(sbet1, cbet1);
 
   phi = lat2 * degree;
   sbet2 = f1 * sin(phi); cbet2 = cos(phi); cbet2(abs(lat2) == 90) = tiny;
-  [sbet2, cbet2] = SinCosNorm(sbet2, cbet2);
+  [sbet2, cbet2] = norm2(sbet2, cbet2);
 
   c = cbet1 < -sbet1 & cbet2 == cbet1;
   sbet2(c) = (2 * (sbet2(c) < 0) - 1) .* sbet1(c);
@@ -222,7 +221,7 @@ function [s12, azi1, azi2, S12, m12, M12, M21, a12] = geoddistance ...
 
     salp1(c) = (salp1a(c) + salp1b(c))/2;
     calp1(c) = (calp1a(c) + calp1b(c))/2;
-    [salp1(g), calp1(g)] = SinCosNorm(salp1(g), calp1(g));
+    [salp1(g), calp1(g)] = norm2(salp1(g), calp1(g));
     tripb(c) = (abs(salp1a(c) - salp1(c)) + (calp1a(c) - calp1(c)) < tolb | ...
                 abs(salp1(c) - salp1b(c)) + (calp1(c) - calp1b(c)) < tolb);
   end
@@ -246,8 +245,8 @@ function [s12, azi1, azi2, S12, m12, M12, M21, a12] = geoddistance ...
     k2 = calp0.^2 * ep2;
     epsi = k2 ./ (2 * (1 + sqrt(1 + k2)) + k2);
     A4 = (a^2 * e2) * calp0 .* salp0;
-    [ssig1, csig1] = SinCosNorm(ssig1, csig1);
-    [ssig2, csig2] = SinCosNorm(ssig2, csig2);
+    [ssig1, csig1] = norm2(ssig1, csig1);
+    [ssig2, csig2] = norm2(ssig2, csig2);
 
     C4x = C4coeff(n);
     C4a = C4f(epsi, C4x);
@@ -268,7 +267,11 @@ function [s12, azi1, azi2, S12, m12, M12, M21, a12] = geoddistance ...
     s = salp12 == 0 & calp12 < 0;
     salp12(s) = tiny * calp1(s); calp12(s) = -1;
     alp12(l) = atan2(salp12, calp12);
-    c2 = (a^2 + b^2 * atanhee(1, e2)) / 2;
+    if e2 ~= 0
+      c2 = (a^2 + b^2 * eatanhe(1, e2) / e2) / 2;
+    else
+      c2 = a^2;
+    end
     S12 = 0 + swapp .* lonsign .* latsign .* (S12 + c2 * alp12);
   end
 
@@ -334,7 +337,7 @@ function [sig12, salp1, calp1, salp2, calp2, dnm] = ...
   calp2(s) = somg12(s).^2 ./ (1 + comg12(s));
   calp2(s & comg12 < 0) = 1 - comg12(s & comg12 < 0);
   calp2(s) = sbet12(s) - cbet1(s) .* sbet2(s) .* calp2(s);
-  [salp2, calp2] = SinCosNorm(salp2, calp2);
+  [salp2, calp2] = norm2(salp2, calp2);
   sig12(s) = atan2(ssig12(s), csig12(s));
 
   s = ~(s | abs(n) > 0.1 | csig12 >= 0 | ssig12 >= 6 * abs(n) * pi * cbet1.^2);
@@ -385,7 +388,7 @@ function [sig12, salp1, calp1, salp2, calp2, dnm] = ...
   end
 
   calp1(salp1 <= 0) = 0; salp1(salp1 <= 0) = 1;
-  [salp1, calp1] = SinCosNorm(salp1, calp1);
+  [salp1, calp1] = norm2(salp1, calp1);
 end
 
 function k = Astroid(x, y)
@@ -414,7 +417,7 @@ function k = Astroid(x, y)
   fl2 = disc >= 0;
   T3 = S(fl2) + r3(fl2);
   T3 = T3 + (1 - 2 * (T3 < 0)) .* sqrt(disc(fl2));
-  T = cbrt(T3);
+  T = cbrtx(T3);
   u(fl2) = u(fl2) + T + cvmgt(r2(fl2) ./ T, 0, T ~= 0);
   ang = atan2(sqrt(-disc(~fl2)), -(S(~fl2) + r3(~fl2)));
   u(~fl2) = u(~fl2) + 2 * r(~fl2) .* cos(ang / 3);
@@ -443,7 +446,7 @@ function [lam12, dlam12, ...
 
   ssig1 = sbet1; somg1 = salp0 .* sbet1;
   csig1 = calp1 .* cbet1; comg1 = csig1;
-  [ssig1, csig1] = SinCosNorm(ssig1, csig1);
+  [ssig1, csig1] = norm2(ssig1, csig1);
 
   salp2 = cvmgt(salp0 ./ cbet2, salp1, cbet2 ~= cbet1);
   calp2 = cvmgt(sqrt((calp1 .* cbet1).^2 + ...
@@ -453,7 +456,7 @@ function [lam12, dlam12, ...
                 abs(calp1), cbet2 ~= cbet1 | abs(sbet2) ~= -sbet1);
   ssig2 = sbet2; somg2 = salp0 .* sbet2;
   csig2 = calp2 .* cbet2;  comg2 = csig2;
-  [ssig2, csig2] = SinCosNorm(ssig2, csig2);
+  [ssig2, csig2] = norm2(ssig2, csig2);
 
   sig12 = atan2(max(csig1 .* ssig2 - ssig1 .* csig2, 0), ...
                 csig1 .* csig2 + ssig1 .* ssig2);

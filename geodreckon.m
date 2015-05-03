@@ -12,10 +12,10 @@ function [lat2, lon2, azi2, S12, m12, M12, M21, a12_s12] = geodreckon ...
 %   azi1 are given in degrees and s12 in meters.  The ellipsoid vector is
 %   of the form [a, e], where a is the equatorial radius in meters, e is
 %   the eccentricity.  If ellipsoid is omitted, the WGS84 ellipsoid (more
-%   precisely, the value returned by DEFAULTELLIPSOID) is used.  lat2,
+%   precisely, the value returned by defaultellipsoid) is used.  lat2,
 %   lon2, and azi2 give the position and forward azimuths at the end point
 %   in degrees.  The other outputs, S12, m12, M12, M21, a12 are documented
-%   in GEODDOC.  GEODDOC also gives the restrictions on the allowed ranges
+%   in geoddoc.  geoddoc also gives the restrictions on the allowed ranges
 %   of the arguments.
 %
 %   flags (default 0) is a combination of 2 flags:
@@ -52,7 +52,7 @@ function [lat2, lon2, azi2, S12, m12, M12, M21, a12_s12] = geodreckon ...
 %
 %     C. F. F. Karney, Algorithms for geodesics,
 %     J. Geodesy 87, 43-55 (2013);
-%     http://dx.doi.org/10.1007/s00190-012-0578-z
+%     https://dx.doi.org/10.1007/s00190-012-0578-z
 %     Addenda: http://geographiclib.sf.net/geod-addenda.html
 %
 %   This function duplicates some of the functionality of the RECKON
@@ -69,9 +69,9 @@ function [lat2, lon2, azi2, S12, m12, M12, M21, a12_s12] = geodreckon ...
 %   See also GEODDOC, GEODDISTANCE, GEODAREA, GEODESICDIRECT, GEODESICLINE,
 %     DEFAULTELLIPSOID.
 
-% Copyright (c) Charles Karney (2012-2014) <charles@karney.com>.
+% Copyright (c) Charles Karney (2012-2015) <charles@karney.com>.
 %
-% This file was distributed with GeographicLib 1.39.
+% This file was distributed with GeographicLib 1.42.
 %
 % This is a straightforward transcription of the C++ implementation in
 % GeographicLib and the C++ source should be consulted for additional
@@ -79,10 +79,10 @@ function [lat2, lon2, azi2, S12, m12, M12, M21, a12_s12] = geodreckon ...
 % with array arguments are identical to those obtained with multiple calls
 % with scalar arguments.
 
-  if nargin < 4, error('Too few input arguments'), end
+  narginchk(4, 6)
   try
     S = size(lat1 + lon1 + s12_a12 + azi1);
-  catch err
+  catch
     error('lat1, lon1, s12, azi1 have incompatible sizes')
   end
   if nargin <= 4
@@ -141,13 +141,13 @@ function [lat2, lon2, azi2, S12, m12, M12, M21, a12_s12] = geodreckon ...
   phi = lat1 * degree;
   sbet1 = f1 * sin(phi);
   cbet1 = cos(phi); cbet1(abs(lat1) == 90) = tiny;
-  [sbet1, cbet1] = SinCosNorm(sbet1, cbet1);
+  [sbet1, cbet1] = norm2(sbet1, cbet1);
   dn1 = sqrt(1 + ep2 * sbet1.^2);
 
   salp0 = salp1 .* cbet1; calp0 = hypot(calp1, salp1 .* sbet1);
   ssig1 = sbet1; somg1 = salp0 .* sbet1;
   csig1 = cbet1 .* calp1; csig1(sbet1 == 0 & calp1 == 0) = 1; comg1 = csig1;
-  [ssig1, csig1] = SinCosNorm(ssig1, csig1);
+  [ssig1, csig1] = norm2(ssig1, csig1);
 
   k2 = calp0.^2 * ep2;
   epsi = k2 ./ (2 * (1 + sqrt(1 + k2)) + k2);
@@ -173,7 +173,7 @@ function [lat2, lon2, azi2, S12, m12, M12, M21, a12_s12] = geodreckon ...
   else
     tau12 = s12_a12 ./ (b * (1 + A1m1));
     s = sin(tau12); c = cos(tau12);
-    B12 = - SinCosSeries(true,  stau1 .* c + ctau1 .* s, ...
+    B12 = - SinCosSeries(true, stau1 .* c + ctau1 .* s, ...
                          ctau1 .* c - stau1 .* s, C1pa);
     sig12 = tau12 - (B12 - B11);
     ssig12 = sin(sig12); csig12 = cos(sig12);
@@ -262,7 +262,11 @@ function [lat2, lon2, azi2, S12, m12, M12, M21, a12_s12] = geodreckon ...
     calp12(s) = calp2(s) .* calp1(s) + salp2(s) .* salp1(s);
     s = s & salp12 == 0 & calp12 < 0;
     salp12(s) = tiny * calp1(s); calp12(s) = -1;
-    c2 = (a^2 + b^2 * atanhee(1, e2)) / 2;
+    if e2 ~= 0
+      c2 = (a^2 + b^2 * eatanhe(1, e2) / e2) / 2;
+    else
+      c2 = a^2;
+    end
     S12 = c2 * atan2(salp12, calp12) + A4 .* (B42 - B41);
   end
 
