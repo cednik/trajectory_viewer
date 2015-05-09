@@ -10,6 +10,7 @@ classdef Udp < handle
         con;
         is_open;
         datagramReceivedFcn;
+        rx_buff;
     end
     properties (Dependent)
         DatagramReceivedFcn;
@@ -24,13 +25,14 @@ classdef Udp < handle
             addRequired(parser, 'rport', check_port);
             addOptional(parser, 'LocalPort', 10000, check_port);
             addOptional(parser, 'Forcepnet', false, @islogical);
-            addOptional(parser, 'pnetCheckRecBuffFreq', 25, ...
+            addOptional(parser, 'pnetCheckRecBuffFreq', 100, ...
                 @(v)isnumeric(v) && isreal(v) && v > 0 && v <= 1000);
             addOptional(parser, 'DatagramReceivedFcn', @(~, ~)0, @(v)isa(v, 'function_handle'));
             parse(parser, rhost, rport, varargin{:});
             obj.params = parser.Results;
             obj.datagramReceivedFcn = parser.Results.DatagramReceivedFcn;
             obj.is_open = false;
+            obj.rx_buff = [];
             if ~is_toolbox_available('Instrument Control Toolbox') || parser.Results.Forcepnet
                 obj.is_pnet = true;
                 obj.read_timer = timer(...
@@ -70,18 +72,10 @@ classdef Udp < handle
         end
         
         function fopen(obj)
-            if obj.is_open
-                fclose(obj);
-            end
-            if obj.is_pnet
-                pnet(obj.con, 'udpconnect', obj.params.rhost, obj.params.rport);
-                if obj.con == -1
-                    error('Udp:pnet', 'Can''t connect!');
+            if ~obj.is_pnet
+                if obj.is_open
+                    fclose(obj);
                 end
-                if ~obj.read_timer.Running
-                    start(obj.read_timer);
-                end
-            else
                 fopen(obj.con);
             end
             obj.is_open = true;
@@ -101,18 +95,30 @@ classdef Udp < handle
         
         function data = fread(obj, size)
             if obj.is_pnet
-                data = pnet(obj.con, 'read', size, 'uint8');
+                running = obj.read_timer.Running;
+                if strcmp(running, 'on')
+                    stop(obj.read_timer);
+                end
+                while length(obj.rx_buff) < size
+                    process_rx(obj);
+                end
+                data = obj.rx_buff(1:size);
+                obj.rx_buff = obj.rx_buff(size+1:end);
+                if strcmp(running, 'on')
+                    start(obj.read_timer);
+                end
             else
                 data = fread(obj.con, size);
             end
         end
         
-        function fwrite(obj, data)
+        function len = fwrite(obj, data)
             if obj.is_pnet
-                pnet(obj.con, 'write', data)
-                pnet(obj.con, 'writepacket');
+                pnet(obj.con, 'write', data);
+                len = pnet(obj.con, 'writepacket', obj.params.rhost, obj.params.rport);
             else
                 fwrite(obj.con, data);
+                len = length(data);
             end
         end
         
@@ -147,19 +153,25 @@ classdef Udp < handle
     
     methods (Access = private)
         function process_rx(obj)
-            %fprintf('process<%s>...\n', obj.Name);
             len = pnet(obj.con, 'readpacket', 65536, 'noblock');
-            %fprintf('...<%s>(%d)\n', obj.Name, len);
-            if len > 0 && isa(obj.datagramReceivedFcn, 'function_handle')
-                [ip, port] = pnet(obj.con,'gethost');
-                ip = sprintf('%d.%d.%d.%d', ip(1), ip(2), ip(3), ip(4));
-                obj.datagramReceivedFcn(obj, struct(...
-                    'Type', 'DatagramReceived', ...
-                    'Data', struct( ...
-                        'AbsTime', clock(), ...
-                        'DatagramAddress', ip, ...
-                        'DatagramLength', len, ...
-                        'DatagramPort', port)));
+            if len == -1
+                pnet(obj.con, 'close');
+                obj.con = pnet('udpsocket', obj.params.LocalPort);
+            end
+            if len > 0
+                i = length(obj.rx_buff);
+                obj.rx_buff(i+1:i+len) = pnet(obj.con, 'read', len, 'uint8');
+                if isa(obj.datagramReceivedFcn, 'function_handle')
+                    [ip, port] = pnet(obj.con,'gethost');
+                    ip = sprintf('%d.%d.%d.%d', ip(1), ip(2), ip(3), ip(4));
+                    obj.datagramReceivedFcn(obj, struct(...
+                        'Type', 'DatagramReceived', ...
+                        'Data', struct( ...
+                            'AbsTime', clock(), ...
+                            'DatagramAddress', ip, ...
+                            'DatagramLength', len, ...
+                            'DatagramPort', port)));
+                end
             end
         end
     end
