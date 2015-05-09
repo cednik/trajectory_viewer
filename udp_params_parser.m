@@ -21,5 +21,5 @@ function u = udp_params_parser(params_struct)
         params_struct.LocalPort = params_struct.lport;
         params_struct = rmfield(params_struct, 'lport');
     end
-    u = udp(rhost, rport, params_struct);
+    u = Udp(rhost, rport, params_struct);
 end

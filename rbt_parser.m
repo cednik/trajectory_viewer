@@ -62,11 +62,11 @@ classdef rbt_parser < handle
             while i <= length(data)
                 switch(data(i))
                     case 1
-                        [i o] = get_register(obj, data, i, o, 1);
+                        [i, o] = get_register(obj, data, i, o, 1);
                     case 2
-                        [i o] = get_register(obj, data, i, o, 2);
+                        [i, o] = get_register(obj, data, i, o, 2);
                     case 3
-                        [i o] = get_register(obj, data, i, o, 4);
+                        [i, o] = get_register(obj, data, i, o, 4);
                     case 17
                         i = set_register(obj, data, i, 1);
                     case 18
@@ -102,7 +102,7 @@ classdef rbt_parser < handle
             end
         end
         
-        function [i o] = get_register(obj, data, i, o, len)
+        function [i, o] = get_register(obj, data, i, o, len)
             if (o + 2 + len) > obj.max_datagram_length
                 send_output_buffer(obj, o);
                 o = 9;

@@ -35,6 +35,7 @@ classdef gps_emulator < handle
             addOptional(parser, 'homeCoordinates', [0 0 0], ...
                 @(v)isnumeric(v) && isreal(v) && length(v) > 1 && length(v) < 4);
             addOptional(parser, 'UTCoffset', [], @(v)ischar(v) || (isnumeric(v) && isreal(v)));
+            addOptional(parser, 'start', true, @(v)islogical(v));
             parse(parser, varargin{:});
             obj.home_coor = parser.Results.homeCoordinates;
             if length(obj.home_coor) < 3
@@ -42,7 +43,8 @@ classdef gps_emulator < handle
             end
             cat_params = parse_categories(parser.Unmatched, {'udp'});
             obj.connection = udp_params_parser(cat_params.udp);
-            set(obj.connection, 'DatagramReceivedFcn', @(src, event)recv(src, event));
+            set(obj.connection, 'DatagramReceivedFcn', ...
+                @(src, event)recv(src, event, 'GPS emulator received data on '));
             obj.msg = char(zeros(1, obj.max_msg_length));
             if version_diff('R2014b') >= 0
                 zone = parser.Results.UTCoffset;
@@ -83,7 +85,9 @@ classdef gps_emulator < handle
                 'TimerFcn', @(~, ~)process(obj), ...
                 'Name', sprintf('Sending timer of %s''s GPS emulator', obj.robot.robot.name));
             fopen(obj.connection);
-            start(obj.sending_timer);
+            if parser.Results.start
+                start(obj.sending_timer);
+            end
         end
         
         function delete(obj)
@@ -96,9 +100,21 @@ classdef gps_emulator < handle
             fclose(obj.connection);
             delete(obj.connection);
         end
+        
+        function pause(obj)
+            if strcmp(obj.sending_timer.Running, 'on')
+                stop(obj.sending_timer)
+            end
+        end
+        
+        function resume(obj)
+            if strcmp(obj.sending_timer.Running, 'off')
+                start(obj.sending_timer)
+            end
+        end
     end
     
-    methods (Access = private, Hidden = true)
+    methods %(Access = private, Hidden = true)
         function process(obj)
             t = obj.get_utc_time();
             coor = obj.robot.position;
@@ -128,7 +144,7 @@ classdef gps_emulator < handle
             add_sentence(obj, 2, 'GN', t);
             add_sentence(obj, 3, t, rad2deg(mod(2.5*pi-coor(6), 2*pi)), ...
                 rad2deg(mod(2*pi+coor(5), 2*pi)));
-            fprintf(obj.connection, obj.msg(1:obj.ptr-1));
+            fwrite(obj.connection, obj.msg(1:obj.ptr-1));
         end
         
         function add_sentence(obj, sentence_num, varargin)
@@ -147,12 +163,4 @@ function sentence = add_checksum(sentence)
         cs = bitxor(cs, uint8(sentence(i)));
     end
     sentence(stop+2:stop+3) = sprintf('%02X', cs);
-end
-
-function recv(src, event)
-    fprintf(['GPS emulator received data on interface %s:\n', ...
-        '\tfrom %s:%d; time: %s; data[%d bytes]:\n%s\n>>>end of data\n'], ...
-        src.Name, event.Data.DatagramAddress, event.Data.DatagramPort, ...
-        event.Data.AbsTime, event.Data.DatagramLength, ...
-        fread(src, event.Data.DatagramLength));
 end

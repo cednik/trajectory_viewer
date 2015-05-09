@@ -47,9 +47,9 @@ classdef trajectory_t < handle
             if length(coor) == 3
                 abs_rot = true;
                 if absolute
-                    [r p y] = calc_orientation(obj);
+                    [r, p, y] = calc_orientation(obj);
                 else
-                    [r p y] = calc_orientation(obj, coor);
+                    [r, p, y] = calc_orientation(obj, coor);
                 end
                 coor = [coor, r, p, y];
             elseif length(coor) ~= size(obj.Coor, 2)
@@ -98,7 +98,7 @@ classdef trajectory_t < handle
     end
     
     methods (Access = private)
-        function [r p y] = calc_orientation(obj, dif)
+        function [r, p, y] = calc_orientation(obj, dif)
             if nargin < 2 || isempty(dif)
                 dif = diff(obj.Coor(obj.points-1:obj.points, 1:3));
             end

@@ -1,6 +1,7 @@
 function set_speed(left, right, rear_left, rear_right)
     robot_definition = evalin('base', 'robot_definition');
     robot_local_port = evalin('base', 'robot_local_port');
+    force_pnet = evalin('base', 'force_pnet');
     data = zeros(8 + 2 * 6, 1, 'uint8');
     data(1:3) = [204 1 2];
     convert = @(speed)typecast(swapbytes(int32(speed * robot_definition.maxSpeedValue)), 'uint8');
@@ -19,7 +20,11 @@ function set_speed(left, right, rear_left, rear_right)
         data(21:26) = [cmd 11 convert(-rear_right)];
     end
     data(4:5) = typecast(swapbytes(uint16(length(data) - 8)), 'uint8');
-    u = udp('127.0.0.1', robot_local_port);
+%     for i = 1:length(data)
+%         fprintf('%02X ', data(i));
+%     end
+%     fprintf('\n');
+    u = Udp('127.0.0.1', robot_local_port, 'forcepnet', force_pnet);
     fopen(u);
     fwrite(u, data);
     fclose(u);
