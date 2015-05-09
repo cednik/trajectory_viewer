@@ -175,4 +175,23 @@ classdef Udp < handle
             end
         end
     end
+    
+    methods (Static)
+        function init_pnet(force)
+            if nargin < 1
+                force = false;
+            end
+            if (is_toolbox_available('Instrument Control Toolbox') && ~force) ...
+                    || exist('pnet') == 3
+                return;
+            end
+            try
+                mex -O pnet.c ws2_32.lib -DWIN32
+            catch ME
+                rethrow(addCause(ME, MException('Udp:pnet:compilation', ...
+                    ['Unable to compile pnet, bacouse following reasons. ', ...
+                     'Please try to compile manually - read the header of pnet.c'])));
+            end
+        end
+    end
 end
