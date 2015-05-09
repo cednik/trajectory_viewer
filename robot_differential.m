@@ -104,13 +104,15 @@ classdef robot_differential < handle
         end
         
         function pause(obj)
-            stop(obj.integration_loop_timer)
-            disp('paused');
+            if strcmp(obj.integration_loop_timer.Running, 'on')
+                stop(obj.integration_loop_timer)
+            end
         end
         
         function resume(obj)
-            start(obj.integration_loop_timer)
-            disp('resumed');
+            if strcmp(obj.integration_loop_timer.Running, 'off')
+                start(obj.integration_loop_timer)
+            end
         end
     end
     
@@ -146,22 +148,19 @@ classdef robot_differential < handle
 %                 * obj.integration_multiplier;
             
             de = [obj.wheel_left.speed.simulation, obj.wheel_right.speed.simulation];
+            sum_de = de(1) + de(2);
+            diff_de = de(2) - de(1);
             phi = obj.position(6);
-            dphi = (de(2) - de(1)) / obj.robot.trackWidth;
-%             if dphi ~= 0
-%                 r0 = obj.robot.trackWidth * sum(de) / (2 * (de(2) - de(1)));
-%                 dx = r0 * (cos(dphi) * sin(phi) + sin(dphi) * cos(phi) - sin(phi));
-%                 dy = r0 * (sin(dphi) * sin(phi) - cos(dphi) * cos(phi) + cos(phi));
-%             else
-%                 s0 = (de(1) + de(2)) / 2;
-%                 dx = s0 * cos(phi);
-%                 dy = s0 * sin(phi);
-%             end
-            % faster approximation
-            dphi2 = dphi / 2;
-            s0 = (de(1) + de(2)) / 2;
-            dx = s0 * cos(phi + dphi2);
-            dy = s0 * sin(phi + dphi2);
+            dphi = diff_de / obj.robot.trackWidth;
+            if dphi ~= 0
+                r0 = obj.robot.trackWidth * sum_de / (2 * diff_de);
+                dx = r0 * (cos(dphi) * sin(phi) + sin(dphi) * cos(phi) - sin(phi));
+                dy = r0 * (sin(dphi) * sin(phi) - cos(dphi) * cos(phi) + cos(phi));
+            else
+                s0 = sum_de / 2;
+                dx = s0 * cos(phi);
+                dy = s0 * sin(phi);
+            end
             obj.position = add_point_rel_fast(obj.trajectory, [dx, dy, 0, 0, 0, dphi]);
         end
     end

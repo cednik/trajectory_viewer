@@ -1,15 +1,15 @@
 clc;
 close all;
 clear all;
-%clear classes;
+clear classes;
 
 %% settings
 
 robot_definition = select_robot('FektBot'); % FektBot / Orpheus / SixWheel (incomplete)
 
-max_integration_loop_freq = 500; % Hz (1000 Hz is maximum)
+max_integration_loop_freq = 100; % Hz (1000 Hz is maximum)
 
-gps_update_rate = 20; % Hz
+gps_update_rate = 0.5; % Hz
 
 viewer_fps = 10;
 
@@ -35,6 +35,8 @@ trajectory_line_styte = struct('color', 'm', 'lineWidth', 1);
 
 delete_all_when_viewer_closed = true;
 
+force_pnet = true;
+
 connect_to_gps = false;
 % if true, created udp object, connected to gps_emulator, which print it's output to matlab console
 
@@ -50,11 +52,12 @@ robot = eval([robot_definition.model, ...
 
 cmd_parser = rbt_parser(robot, ...
     'udp:RemoteHost', remote_ip, 'udp:RemotePort', robot_remote_port, ...
-    'udp:LocalPort', robot_local_port);
+    'udp:LocalPort', robot_local_port, 'udp:forcepnet', force_pnet);
 
 gps = gps_emulator(robot, 'fps', gps_update_rate, 'HomeCoordinates', gps_home_coordinates, ...
     'UTCoffset', gps_time_UTC_offset, 'udp:RemoteHost', remote_ip, ...
-    'udp:RemotePort', gps_remote_port, 'udp:LocalPort', gps_local_port);
+    'udp:RemotePort', gps_remote_port, 'udp:LocalPort', gps_local_port, ...
+    'udp:forcepnet', force_pnet, 'start', false);
 
 viewer = viewer(robot, 'fps', viewer_fps);
 
@@ -63,9 +66,12 @@ if delete_all_when_viewer_closed
 end
 
 if connect_to_gps
-    gps_listener = udp('127.0.0.1', gps_local_port, 'localPort', gps_remote_port);
+    gps_listener = Udp('127.0.0.1', gps_local_port, 'localPort', gps_remote_port, ...
+        'forcepnet', force_pnet);
     set(gps_listener, 'DatagramReceivedFcn', ...
         @(src, event)fprintf('\tFrom GPS:\n%s\n', fread(src, event.Data.DatagramLength)));
     fopen(gps_listener);
     addlistener(viewer, 'Deleting', @(~, ~)delete(gps_listener));
 end
+
+resume(gps);
