@@ -48,6 +48,9 @@ When using Visual C++, compile this with:
 mex -O pnet.c ws2_32.lib -DWIN32
 
 
+If you want to view first load message, add -DSHOW_MESSAGE_ON_LOAD
+
+
 == Main Authour ==           == Windows support ==      == Earlie/Basic UDP support ==
 Peter Rydesäter              Mario Bergeron             Mike Medeiros at 23-Jan-2001.
 LYRtech
@@ -55,8 +58,8 @@ LYRtech
 +46 70 560 68 16
 Peter.Rydesater@mh.se        Mario.Bergeron@lyrtech.com
 
-
-SE MORE:  http://www.rydesater.com
+== Small improvement ==
+Jakub Streit
 
 **********************************************************/
 
@@ -278,42 +281,47 @@ mxClassID classid2size(const mxClassID id)
 /* Windows implementation of perror() function */
 #ifdef WIN32
 /********************************************************************/
-void perror(const char *context)
+int my_perror(const char *context, const int* p_wsa_err)
 {
 	int wsa_err;
-	wsa_err = WSAGetLastError();
-	mexPrintf("[%s]: WSA error: ", context);
-	switch (wsa_err)
-	{
-	case WSANOTINITIALISED: mexPrintf("WSANOTINITIALISED\n"); break;
-	case WSAENETDOWN:       mexPrintf("WSAENETDOWN      \n"); break;
-	case WSAEADDRINUSE:     mexPrintf("WSAEADDRINUSE    \n"); break;
-	case WSAEACCES:         mexPrintf("WSAEACCES        \n"); break;
-	case WSAEINTR:          mexPrintf("WSAEINTR         \n"); break;
-	case WSAEINPROGRESS:    mexPrintf("WSAEINPROGRESS   \n"); break;
-	case WSAEALREADY:       mexPrintf("WSAEALREADY      \n"); break;
-	case WSAEADDRNOTAVAIL:  mexPrintf("WSAEADDRNOTAVAIL \n"); break;
-	case WSAEAFNOSUPPORT:   mexPrintf("WSAEAFNOSUPPORT  \n"); break;
-	case WSAEFAULT:         mexPrintf("WSAEFAULT        \n"); break;
-	case WSAENETRESET:      mexPrintf("WSAENETRESET     \n"); break;
-	case WSAENOBUFS:        mexPrintf("WSAENOBUFS       \n"); break;
-	case WSAENOTSOCK:       mexPrintf("WSAENOTSOCK      \n"); break;
-	case WSAEOPNOTSUPP:     mexPrintf("WSAEOPNOTSUPP    \n"); break;
-	case WSAESHUTDOWN:      mexPrintf("WSAESHUTDOWN     \n"); break;
-	case WSAEWOULDBLOCK:    mexPrintf("WSAEWOULDBLOCK   \n"); break;
-	case WSAEMSGSIZE:       mexPrintf("WSAEMSGSIZE      \n"); break;
-	case WSAEHOSTUNREACH:   mexPrintf("WSAEHOSTUNREACH  \n"); break;
-	case WSAEINVAL:         mexPrintf("WSAEINVAL        \n"); break;
+    if (p_wsa_err == NULL)
+        wsa_err = WSAGetLastError();
+    else
+        wsa_err = *p_wsa_err;
+    if (context != NULL){
+        mexPrintf("[%s]: WSA error: ", context);
+        switch (wsa_err)
+        {
+        case WSANOTINITIALISED: mexPrintf("WSANOTINITIALISED\n"); break;
+        case WSAENETDOWN:       mexPrintf("WSAENETDOWN      \n"); break;
+        case WSAEADDRINUSE:     mexPrintf("WSAEADDRINUSE    \n"); break;
+        case WSAEACCES:         mexPrintf("WSAEACCES        \n"); break;
+        case WSAEINTR:          mexPrintf("WSAEINTR         \n"); break;
+        case WSAEINPROGRESS:    mexPrintf("WSAEINPROGRESS   \n"); break;
+        case WSAEALREADY:       mexPrintf("WSAEALREADY      \n"); break;
+        case WSAEADDRNOTAVAIL:  mexPrintf("WSAEADDRNOTAVAIL \n"); break;
+        case WSAEAFNOSUPPORT:   mexPrintf("WSAEAFNOSUPPORT  \n"); break;
+        case WSAEFAULT:         mexPrintf("WSAEFAULT        \n"); break;
+        case WSAENETRESET:      mexPrintf("WSAENETRESET     \n"); break;
+        case WSAENOBUFS:        mexPrintf("WSAENOBUFS       \n"); break;
+        case WSAENOTSOCK:       mexPrintf("WSAENOTSOCK      \n"); break;
+        case WSAEOPNOTSUPP:     mexPrintf("WSAEOPNOTSUPP    \n"); break;
+        case WSAESHUTDOWN:      mexPrintf("WSAESHUTDOWN     \n"); break;
+        case WSAEWOULDBLOCK:    mexPrintf("WSAEWOULDBLOCK   \n"); break;
+        case WSAEMSGSIZE:       mexPrintf("WSAEMSGSIZE      \n"); break;
+        case WSAEHOSTUNREACH:   mexPrintf("WSAEHOSTUNREACH  \n"); break;
+        case WSAEINVAL:         mexPrintf("WSAEINVAL        \n"); break;
 
-	case WSAECONNREFUSED:   mexPrintf("WSAECONNREFUSED  \n"); break;
-	case WSAECONNABORTED:   mexPrintf("WSAECONNABORTED  \n"); break;
-	case WSAECONNRESET:     mexPrintf("WSAECONNRESET    \n"); break;
-	case WSAEISCONN:        mexPrintf("WSAEISCONN       \n"); break;
-	case WSAENOTCONN:       mexPrintf("WSAENOTCONN      \n"); break;
-	case WSAETIMEDOUT:      mexPrintf("WSAETIMEDOUT     \n"); break;
-	default:                mexPrintf("Unknown(%d) error!\n", wsa_err); break;
-	}
-	return;
+        case WSAECONNREFUSED:   mexPrintf("WSAECONNREFUSED  \n"); break;
+        case WSAECONNABORTED:   mexPrintf("WSAECONNABORTED  \n"); break;
+        case WSAECONNRESET:     mexPrintf("WSAECONNRESET    \n"); break;
+        case WSAEISCONN:        mexPrintf("WSAEISCONN       \n"); break;
+        case WSAENOTCONN:       mexPrintf("WSAENOTCONN      \n"); break;
+        case WSAETIMEDOUT:      mexPrintf("WSAETIMEDOUT     \n"); break;
+        default:                mexPrintf("Unknown(%d) error!\n", wsa_err); break;
+        }
+    }
+	return wsa_err;
 }
 #endif
 
@@ -786,7 +794,7 @@ int writedata()
 			//	   IFWINDOWS( && s_errno!=WSAECONNRESET  )           // DEBUG: REMOVE THIS LINE?
 			){
 			con[con_index].status = STATUS_NOCONNECT;
-			perror("sendto() / send()");
+			my_perror("sendto() / send()", NULL);
 			mexPrintf("\nREMOTE HOST DISCONNECTED\n");
 			break;
 		}
@@ -853,6 +861,7 @@ int read2buff(const int len, int newline, int noblock)
 {
 	const double timeoutat = my_now() + con[con_index].readtimeout;
 	int retval = -1;
+    int wsa_err = 0;
 
 	if (len < con[con_index].read.pos)              /* If enouth in buffer then return */
 		return len;
@@ -896,8 +905,13 @@ int read2buff(const int len, int newline, int noblock)
 				//	       IFWINDOWS( && s_errno!=WSAECONNRESET )// DEBUG: REMOVE THIS LINE?
 				) {
 				con[con_index].status = STATUS_NOCONNECT;
-				perror("recvfrom() or recv()");
-				break;
+                wsa_err = my_perror(NULL, NULL);
+                if (wsa_err == WSAECONNRESET)
+                    return -1;
+                else {
+                    my_perror("recvfrom() or recv()", &wsa_err);
+                    break;
+                }
 			}
 		}
 		//	fprintf(stderr,"RET:%d/%d ",retval,s_errno);
@@ -1048,8 +1062,10 @@ void mexFunction(
 			mexErrMsgTxt("Error starting WINSOCK32.");
 #endif
 
+#ifdef SHOW_MESSAGE_ON_LOAD
 		Print_Start_Message();
-
+#endif
+        
 		mexAtExit(CleanUpMex);
 		/* Init all connecttions to to free */
 		for (con_index = 0; con_index < MAX_CON; con_index++)
@@ -1189,7 +1205,8 @@ void mexFunction(
 		return;
 	}
 	if (myoptstrcmp(fun, "WRITEFROMFILE") == 0){
-		int len = 1024 * 1024 * 1024; int start = 0;
+		int len = 1024 * 1024 * 1024;
+        int start = 0;
 		FILE *f = fopen(my_mexInputOptionString(2), "rb");
 		if (f == NULL)
 			my_mexReturnValue(-1);
@@ -1222,7 +1239,7 @@ void mexFunction(
 	}
 	if (myoptstrcmp(fun, "WRITEPACKET") == 0){
 		if (IS_STATUS_UDP_NO_CON(con[con_index].status))
-			ipv4_lookup(my_mexInputOptionString(2), my_mexInputScalar(3));
+			ipv4_lookup(my_mexInputOptionString(2), (int)my_mexInputScalar(3));
 		my_mexReturnValue(writedata());
 		con[con_index].write.pos = 0;
 		return;

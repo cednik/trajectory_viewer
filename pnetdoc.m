@@ -190,11 +190,12 @@
 %     UDP socket causing that the 'writepacket' commands should not have any
 %     'hostname' and port arguments supplied.
 %     
-%  pnet(sock,'writepacket' [,'hostname',port]);
+%  elements=pnet(sock,'writepacket' [,'hostname',port]);
 %     
 %     Sends contents of the sockets write buffer as a UDP packet. If the UDP
 %     socket is not connected 'hostname' and port must be supplied, if connected
 %     the arguments is ignored.
+%     Returns number of elements successfully written ('write' cmd returns nothing).     
 %     
 %  size=pnet(sock,'readpacket'[,maxsize][,'noblock']);
 %     

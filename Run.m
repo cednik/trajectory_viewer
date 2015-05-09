@@ -9,7 +9,7 @@ robot_definition = select_robot('FektBot'); % FektBot / Orpheus / SixWheel (inco
 
 max_integration_loop_freq = 100; % Hz (1000 Hz is maximum)
 
-gps_update_rate = 0.5; % Hz
+gps_update_rate = 20; % Hz
 
 viewer_fps = 10;
 
