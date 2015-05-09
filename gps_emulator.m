@@ -114,7 +114,7 @@ classdef gps_emulator < handle
         end
     end
     
-    methods %(Access = private, Hidden = true)
+    methods (Access = private, Hidden = true)
         function process(obj)
             t = obj.get_utc_time();
             coor = obj.robot.position;

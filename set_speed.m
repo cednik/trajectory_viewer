@@ -20,10 +20,6 @@ function set_speed(left, right, rear_left, rear_right)
         data(21:26) = [cmd 11 convert(-rear_right)];
     end
     data(4:5) = typecast(swapbytes(uint16(length(data) - 8)), 'uint8');
-%     for i = 1:length(data)
-%         fprintf('%02X ', data(i));
-%     end
-%     fprintf('\n');
     u = Udp('127.0.0.1', robot_local_port, 'forcepnet', force_pnet);
     fopen(u);
     fwrite(u, data);
