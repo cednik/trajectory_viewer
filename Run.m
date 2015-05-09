@@ -5,7 +5,7 @@ clear classes;
 
 %% settings
 
-robot_definition = select_robot('FektBot'); % FektBot / Orpheus / SixWheel (incomplete)
+robot_definition = select_robot('orpheus'); % FektBot / Orpheus / SixWheel (incomplete)
 
 max_integration_loop_freq = 100; % Hz (1000 Hz is maximum)
 
@@ -13,7 +13,7 @@ gps_update_rate = 20; % Hz
 
 viewer_fps = 10;
 
-trajectory_alloc_size = min(max_integration_loop_freq, robot_definition.regulationLoopFrequency) ...
+trajectory_alloc_size = min(max_integration_loop_freq, robot_definition.integrationLoopFrequency)...
     * 60 * 15; % Fin [Hz] * seconds per min * minutes
 
 robot_start_position = [0 0 0, 0 0 pi/2]; % X Y Z, Roll Pitch Yaw [m m m, rad rad rad]
@@ -35,7 +35,9 @@ trajectory_line_styte = struct('color', 'm', 'lineWidth', 1);
 
 delete_all_when_viewer_closed = true;
 
-force_pnet = true;
+force_pnet = false;
+% if true, pnet is used instead of udp from Instrument Control Toolbox
+%  otherwise Instrument Control Toolbox is preffered (if available)
 
 connect_to_gps = false;
 % if true, created udp object, connected to gps_emulator, which print it's output to matlab console

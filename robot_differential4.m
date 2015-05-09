@@ -21,25 +21,37 @@ classdef robot_differential4 < robot_differential
         function set_register(obj, index, value)
             switch(index)
                 case 8
-                    obj.wheel_left.front.speed = set_speed(obj, value, false);
-                    obj.wheel_left.speed = speed_average(obj.wheel_left);
+                    obj.wheel_left.front.virtualSpeed = ...
+                        clamp(value, -obj.robot.maxSpeedValue, obj.robot.maxSpeedValue);
+                    obj.wheel_left.speed = (double(obj.wheel_left.front.virtualSpeed) ...
+                        + double(obj.wheel_left.rear.virtualSpeed)) ...
+                        * obj.unit_speed / 2;
                 case 9
-                    obj.wheel_left.rear.speed = set_speed(obj, value, false);
-                    obj.wheel_left.speed = speed_average(obj.wheel_left);
+                    obj.wheel_left.rear.virtualSpeed = ...
+                        clamp(value, -obj.robot.maxSpeedValue, obj.robot.maxSpeedValue);
+                    obj.wheel_left.speed = (double(obj.wheel_left.front.virtualSpeed) ...
+                        + double(obj.wheel_left.rear.virtualSpeed)) ...
+                        * obj.unit_speed / 2;
                 case 10
-                    obj.wheel_right.front.speed = set_speed(obj, value, true);
-                    obj.wheel_right.speed = speed_average(obj.wheel_right);
+                    obj.wheel_right.front.virtualSpeed = ...
+                        clamp(-value, -obj.robot.maxSpeedValue, obj.robot.maxSpeedValue);
+                    obj.wheel_right.speed = (double(obj.wheel_right.front.virtualSpeed) ...
+                        + double(obj.wheel_right.rear.virtualSpeed)) ...
+                        * obj.unit_speed / 2;
                 case 11
-                    obj.wheel_right.rear.speed = set_speed(obj, value, true);
-                    obj.wheel_right.speed = speed_average(obj.wheel_right);
+                    obj.wheel_right.rear.virtualSpeed = ...
+                        clamp(-value, -obj.robot.maxSpeedValue, obj.robot.maxSpeedValue);
+                    obj.wheel_right.speed = (double(obj.wheel_right.front.virtualSpeed) ...
+                        + double(obj.wheel_right.rear.virtualSpeed)) ...
+                        * obj.unit_speed / 2;
                 case 12
-                    obj.wheel_left.front.position.virtual = value; %% not correct
+                    obj.wheel_left.front.distance = double(value) / obj.unit_distance;
                 case 13
-                    obj.wheel_left.rear.position.virtual = value; %% not correct
+                    obj.wheel_left.rear.distance = double(value) / obj.unit_distance;
                 case 14
-                    obj.wheel_right.front.position.virtual = -value; %% not correct
+                    obj.wheel_right.front.distance = double(-value) / obj.unit_distance;
                 case 15
-                    obj.wheel_right.rear.position.virtual = -value; %% not correct
+                    obj.wheel_right.rear.distance = double(-value) / obj.unit_distance;
                 otherwise
                     warning('ROBOT:InvalidRegister', ...
                         'Attempt to set unknown register %d with value %d.', index, value);
@@ -49,21 +61,21 @@ classdef robot_differential4 < robot_differential
         function value = get_register(obj, index, type)
             switch(index)
                 case 8
-                    value = obj.wheel_left.front.speed.virtual;
+                    value = obj.wheel_left.front.virtualSpeed;
                 case 9
-                    value = obj.wheel_left.rear.speed.virtual;
+                    value = obj.wheel_left.rear.virtualSpeed;
                 case 10
-                    value = -obj.wheel_right.front.speed.virtual;
+                    value = -obj.wheel_right.front.virtualSpeed;
                 case 11
-                    value = -obj.wheel_right.rear.speed.virtual;
+                    value = -obj.wheel_right.rear.virtualSpeed;
                 case 12
-                    value = obj.wheel_left.front.position.virtual;
+                    value = obj.c_cast_int32(obj.wheel_left.front.distance * obj.unit_distance);
                 case 13
-                    value = obj.wheel_left.rear.position.virtual;
+                    value = obj.c_cast_int32(obj.wheel_left.rear.distance * obj.unit_distance);
                 case 14
-                    value = -obj.wheel_right.front.position.virtual;
+                    value = obj.c_cast_int32(-obj.wheel_right.front.distance * obj.unit_distance);
                 case 15
-                    value = -obj.wheel_right.rear.position.virtual;
+                    value = obj.c_cast_int32(-obj.wheel_right.rear.distance * obj.unit_distance);
                 otherwise
                     warning('ROBOT:InvalidRegister', ...
                         'Reading unknown register %d.', index);
@@ -78,24 +90,11 @@ classdef robot_differential4 < robot_differential
     %% internal
     methods (Access = protected, Hidden = true)
         function process(obj)
-            obj.wheel_left.front.position.virtual = obj.c_add_int32(...
-                obj.wheel_left.front.position.virtual, ...
-                double(obj.wheel_left.front.speed.virtual) * obj.integration_multiplier);
-            obj.wheel_left.rear.position.virtual = obj.c_add_int32(...
-                obj.wheel_left.rear.position.virtual, ...
-                double(obj.wheel_left.rear.speed.virtual) * obj.integration_multiplier);
-            obj.wheel_right.front.position.virtual = obj.c_add_int32(...
-                obj.wheel_right.front.position.virtual, ...
-                double(obj.wheel_right.front.speed.virtual) * obj.integration_multiplier);
-            obj.wheel_right.rear.position.virtual = obj.c_add_int32(...
-                obj.wheel_right.rear.position.virtual, ...
-                double(obj.wheel_right.rear.speed.virtual) * obj.integration_multiplier);
+            obj.wheel_left.front.distance = obj.wheel_left.front.distance + obj.wheel_left.speed;
+            obj.wheel_left.rear.distance = obj.wheel_left.rear.distance + obj.wheel_left.speed;
+            obj.wheel_right.front.distance = obj.wheel_right.front.distance + obj.wheel_left.speed;
+            obj.wheel_right.rear.distance = obj.wheel_right.rear.distance + obj.wheel_left.speed;
             process@robot_differential(obj);
         end
     end
-end
-
-function speed = speed_average(wheel)
-   speed.simulation = (wheel.front.speed.simulation + wheel.rear.speed.simulation) / 2;
-   speed.virtual = int32((int64(wheel.front.speed.virtual) + int64(wheel.rear.speed.virtual)) / 2);
 end

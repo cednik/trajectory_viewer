@@ -4,7 +4,8 @@ classdef robot_differential < handle
         robot;
         trajectory;
         integration_loop_timer;
-        integration_multiplier;
+        unit_speed;
+        unit_distance;
     end
     
     properties (SetAccess = protected)
@@ -31,23 +32,21 @@ classdef robot_differential < handle
             cat_params = parse_categories(parser.Unmatched, {'trajectory'});
             obj.robot = robot;
             obj.trajectory = trajectory_t(cat_params.trajectory);
-            t = struct('simulation', 0, 'virtual', int32(0));
-            obj.wheel_left = struct('speed', t, 'position', t);
+            obj.wheel_left = struct('virtualSpeed', int32(0), 'speed', 0, 'distance', 0);
             obj.wheel_right = obj.wheel_left;
             obj.position = obj.trajectory.Coor(1, :);
-            reg_loop_time = 1 / obj.robot.regulationLoopFrequency;
+            integration_loop_time = 1 / obj.robot.integrationLoopFrequency;
             min_integration_loop_time = 1 / parser.Results.maxLoopFreq;
-            if reg_loop_time < min_integration_loop_time
-                obj.integration_multiplier = ...
-                    obj.robot.regulationLoopFrequency * min_integration_loop_time;
-                reg_loop_time = min_integration_loop_time;
-            else
-                obj.integration_multiplier = 1;
+            if integration_loop_time < min_integration_loop_time
+                integration_loop_time = min_integration_loop_time;
             end
+            obj.unit_speed = integration_loop_time * obj.robot.maxSpeed ...
+                / double(obj.robot.maxSpeedValue);
+            obj.unit_distance = 1 / obj.robot.virtualDistanceUnit;
             obj.integration_loop_timer = timer(...
                 'BusyMode', 'queue', ...
                 'ExecutionMode', 'fixedRate', ...
-                'Period', reg_loop_time, ...
+                'Period', integration_loop_time, ...
                 'TimerFcn', @(~, ~)process(obj), ...
                 'Name', sprintf('Integration timer of robot %s', obj.robot.name));
             if parser.Results.start
@@ -70,13 +69,17 @@ classdef robot_differential < handle
         function set_register(obj, index, value)
             switch(index)
                 case 8
-                    obj.wheel_left.speed = set_speed(obj, value, false);
+                    obj.wheel_left.virtualSpeed = ...
+                        clamp(value, -obj.robot.maxSpeedValue, obj.robot.maxSpeedValue);
+                    obj.wheel_left.speed = double(obj.wheel_left.virtualSpeed) * obj.unit_speed;
                 case 9
-                    obj.wheel_right.speed = set_speed(obj, value, true);
+                    obj.wheel_right.virtualSpeed = ...
+                        clamp(-value, -obj.robot.maxSpeedValue, obj.robot.maxSpeedValue);
+                    obj.wheel_right.speed = double(obj.wheel_right.virtualSpeed) * obj.unit_speed;
                 case 12
-                    obj.wheel_left.position = set_speed(obj, value, false); %% not correct
+                    obj.wheel_left.distance = double(value) / obj.unit_distance;
                 case 13
-                    obj.wheel_right.position = set_speed(obj, value, true); %% not correct
+                    obj.wheel_right.distance = double(-value) / obj.unit_distance;
                 otherwise
                     warning('ROBOT:InvalidRegister', ...
                         'Attempt to set unknown register %d with value %d.', index, value);
@@ -86,13 +89,13 @@ classdef robot_differential < handle
         function value = get_register(obj, index, type)
             switch(index)
                 case 8
-                    value = obj.wheel_left.speed.virtual;
+                    value = obj.wheel_left.virtualSpeed;
                 case 9
-                    value = -obj.wheel_right.speed.virtual;
+                    value = -obj.wheel_right.virtualSpeed;
                 case 12
-                    value = obj.wheel_left.position.virtual;
+                    value = obj.c_cast_int32(obj.wheel_left.distance * obj.unit_distance);
                 case 13
-                    value = -obj.wheel_right.position.virtual;
+                    value = obj.c_cast_int32(-obj.wheel_right.distance * obj.unit_distance);
                 otherwise
                     warning('ROBOT:InvalidRegister', ...
                         'Reading unknown register %d.', index);
@@ -118,36 +121,11 @@ classdef robot_differential < handle
     
     %% internal
     methods (Access = protected, Hidden = true)
-        % conversion between virtual and simulation units
-        function speed = set_speed(obj, virtual, invert)
-            if invert
-                virtual = -virtual;
-            end
-            if virtual > obj.robot.maxSpeedValue
-                virtual = obj.robot.maxSpeedValue;
-            elseif virtual < -obj.robot.maxSpeedValue
-                virtual = -obj.robot.maxSpeedValue;
-            end
-            speed = struct('simulation', ...
-                double(virtual) * obj.robot.unitSpeed * obj.integration_multiplier, ...
-                'virtual', virtual);
-        end
         
         function process(obj)
-            obj.wheel_left.position.virtual = obj.c_add_int32(...
-                obj.wheel_left.position.virtual, ...
-                double(obj.wheel_left.speed.virtual) * obj.integration_multiplier);
-            obj.wheel_right.position.virtual = obj.c_add_int32(...
-                obj.wheel_right.position.virtual, ...
-                double(obj.wheel_right.speed.virtual) * obj.integration_multiplier);
-%             obj.wheel_left.position.simulation = ...
-%                 obj.wheel_left.position.simulation + obj.wheel_left.speed.simulation ...
-%                 * obj.integration_multiplier;
-%             obj.wheel_right.position.simulation = ...
-%                 obj.wheel_right.position.simulation + obj.wheel_right.speed.simulation ...
-%                 * obj.integration_multiplier;
-            
-            de = [obj.wheel_left.speed.simulation, obj.wheel_right.speed.simulation];
+            obj.wheel_left.distance = obj.wheel_left.distance + obj.wheel_left.speed;
+            obj.wheel_right.distance = obj.wheel_right.distance + obj.wheel_right.speed;
+            de = [obj.wheel_left.speed, obj.wheel_right.speed];
             sum_de = de(1) + de(2);
             diff_de = de(2) - de(1);
             phi = obj.position(6);
@@ -166,9 +144,9 @@ classdef robot_differential < handle
     end
     
     methods (Static = true, Access = protected, Hidden = true)
-        function res = c_add_int32(a, b)
-            res = typecast(int64(a) + int64(b), 'int32');
-            res = res(1);
+        function y = c_cast_int32(x)
+            y = typecast(int64(x), 'int32');
+            y = y(1);
         end
     end
 end
