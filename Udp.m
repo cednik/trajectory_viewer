@@ -11,9 +11,11 @@ classdef Udp < handle
         is_open;
         datagramReceivedFcn;
         rx_buff;
+        timeout;
     end
     properties (Dependent)
         DatagramReceivedFcn;
+        Timeout;
     end
     methods
         function obj = Udp(rhost, rport, varargin)
@@ -28,11 +30,13 @@ classdef Udp < handle
             addOptional(parser, 'pnetCheckRecBuffFreq', 100, ...
                 @(v)isnumeric(v) && isreal(v) && v > 0 && v <= 1000);
             addOptional(parser, 'DatagramReceivedFcn', @(~, ~)0, @(v)isa(v, 'function_handle'));
+            addOptional(parser, 'Timeout', inf, @(v)isnumeric(v) && isreal(v) && v >= 0);
             parse(parser, rhost, rport, varargin{:});
             obj.params = parser.Results;
             obj.datagramReceivedFcn = parser.Results.DatagramReceivedFcn;
             obj.is_open = false;
             obj.rx_buff = [];
+            obj.timeout = parser.Results.Timeout;
             if ~is_toolbox_available('Instrument Control Toolbox') || parser.Results.Forcepnet
                 obj.is_pnet = true;
                 obj.read_timer = timer(...
@@ -47,8 +51,11 @@ classdef Udp < handle
                 obj.is_pnet = false;
                 obj.con = udp(parser.Results.rhost, parser.Results.rport, ...
                     merge_struct(rmfield(parser.Results, ...
-                    {'Forcepnet', 'pnetCheckRecBuffFreq', 'rhost', 'rport'}), ...
+                    {'Forcepnet', 'pnetCheckRecBuffFreq', 'rhost', 'rport', 'Timeout'}), ...
                     parser.Unmatched));
+                if obj.timeout ~= inf
+                    set(obj.con, 'Timeout', obj.timeout);
+                end
             end
             obj.Name = sprintf('Udp<%s>(%s:%d)', conditional(obj.is_pnet, 'pnet', 'udp'), ...
                 parser.Results.rhost, parser.Results.rport);
@@ -99,8 +106,13 @@ classdef Udp < handle
                 if strcmp(running, 'on')
                     stop(obj.read_timer);
                 end
+                t = clock();
                 while length(obj.rx_buff) < size
                     process_rx(obj);
+                    if etime(clock(), t) > obj.timeout
+                        size = length(obj.rx_buff);
+                        break;
+                    end
                 end
                 data = obj.rx_buff(1:size);
                 obj.rx_buff = obj.rx_buff(size+1:end);
@@ -136,6 +148,22 @@ classdef Udp < handle
                 obj.datagramReceivedFcn = fcn;
             else
                 set(obj.con, 'DatagramReceivedFcn', fcn);
+            end
+        end
+        
+        function t = get.Timeout(obj)
+            if obj.is_pnet
+                t = obj.timeout;
+            else
+                t = get(obj.con, 'Timeout');
+            end
+        end
+        
+        function set.Timeout(obj, t)
+            if obj.is_pnet
+                obj.timeout = t;
+            else
+                set(obj.con, 'Timeout', t);
             end
         end
         

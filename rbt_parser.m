@@ -10,6 +10,12 @@ classdef rbt_parser < handle
     properties (SetAccess = private)
         deleted;
         responce_buffer;
+        tx_counter;
+        rx_counter;
+    end
+    properties (SetAccess = private, Dependent)
+        txCount;
+        rxCount;
     end
     methods
         function obj = rbt_parser(robot, varargin)
@@ -24,6 +30,8 @@ classdef rbt_parser < handle
             cat_params = parse_categories(parser.Unmatched, {'udp'});
             obj.connection = udp_params_parser(cat_params.udp);
             set(obj.connection, 'DatagramReceivedFcn', @(~, event)process(obj, event));
+            obj.tx_counter = 0;
+            obj.rx_counter = 0;
             fopen(obj.connection);
         end
         
@@ -36,6 +44,25 @@ classdef rbt_parser < handle
             delete(obj.connection);
         end
         
+        function v = get.txCount(obj)
+            v = obj.tx_counter;
+        end
+        
+        function set.txCount(obj, v)
+            obj.tx_counter = v;
+        end
+        
+        function v = get.rxCount(obj)
+            v = obj.rx_counter;
+        end
+        
+        function set.rxCount(obj, v)
+            obj.rx_counter = v;
+        end
+    end
+    
+    %% internal
+    methods (Access = protected, Hidden = true)
         function process(obj, event)
             data = uint8(fread(obj.connection, event.Data.DatagramLength));
             if length(data) < 8
@@ -57,6 +84,7 @@ classdef rbt_parser < handle
                      '\tDeclared %d, but received only %d bytes.'], reclen, length(data) - 8);
                 return;
             end
+            obj.rxCount = obj.rx_counter + 1;
             i = 9;
             o = uint16(9);
             while i <= length(data)
@@ -84,10 +112,7 @@ classdef rbt_parser < handle
                 send_output_buffer(obj, o);
             end
         end
-    end
     
-    %% internal
-    methods (Access = protected, Hidden = true)
         function i = set_register(obj, data, i, len)
             if (i + 1 + len) > length(data)
                 warning('RBTPARSER:NotEnoughtArguments', ...
@@ -124,6 +149,7 @@ classdef rbt_parser < handle
         function send_output_buffer(obj, o)
             obj.responce_buffer(4:5) = typecast(swapbytes(o - 9), 'uint8');
             fwrite(obj.connection, obj.responce_buffer(1:o-1));
+            obj.txCount = obj.tx_counter + 1;
         end
     end
 end
