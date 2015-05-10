@@ -33,7 +33,6 @@ classdef viewer < handle
             addOptional(parser, 'Position', 'stored', @check_option_position);
             addOptional(parser, 'Fps', 0, @(v)isnumeric(v) && v(1) > 0 && v(1) <= 1000);
             parse(parser, varargin{:});
-            obj.robots = robots;
             if exist(obj.settings_file, 'file') == 2
                 load(obj.settings_file, 'settings');
                 obj.settings = settings;
@@ -102,10 +101,10 @@ classdef viewer < handle
                 struct('trajectory', struct(), 'trajectory_handle', 0, 'symbol', struct()), ...
                 length(robots), 1);
             for i = 1:length(robots)
-                obj.robots(i).trajectory = robots(i).trajectory;
+                obj.robots(i).trajectory = robots{i}.trajectory;
                 obj.robots(i).trajectory_handle = ...
                     plot3(obj.h_axes, nan, nan, nan, obj.robots(i).trajectory.style);
-                obj.robots(i).symbol = init_robot(obj.h_axes, robots.robot.symbol);
+                obj.robots(i).symbol = init_robot(obj.h_axes, robots{i}.robot.symbol);
             end
             set(obj.h_fig, 'Visible', 'on');
             obj.h_refresh_timer = timer(...
@@ -205,7 +204,8 @@ classdef viewer < handle
             set(obj.h_fps, 'String', fps2str(...
                 get(obj.h_refresh_timer, 'InstantPeriod'), ...
                 get(obj.h_refresh_timer, 'AveragePeriod')));
-            for r = obj.robots
+            for i = 1:length(obj.robots)
+                r = obj.robots(i);
                 if ~r.trajectory.updated
                     continue;
                 end
