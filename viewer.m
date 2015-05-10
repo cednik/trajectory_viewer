@@ -97,6 +97,9 @@ classdef viewer < handle
             plot3(obj.h_axes, [0 1], [0 0], [0 0], 'r', 'LineWidth', 2);
             plot3(obj.h_axes, [0 0], [0 1], [0 0], 'g', 'LineWidth', 2);
             plot3(obj.h_axes, [0 0], [0 0], [0 1], 'b', 'LineWidth', 2);
+            if ~iscell(robots)
+                robots = {robots};
+            end
             obj.robots = repmat(...
                 struct('trajectory', struct(), 'trajectory_handle', 0, 'symbol', struct()), ...
                 length(robots), 1);
