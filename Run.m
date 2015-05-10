@@ -5,7 +5,7 @@ clear classes;
 
 %% settings
 
-robot_definition = select_robot('orpheus'); % FektBot / Orpheus / SixWheel (incomplete)
+robot_definition = select_robot('sixwheel'); % FektBot / Orpheus / SixWheel
 
 max_integration_loop_freq = 100; % Hz (1000 Hz is maximum)
 
