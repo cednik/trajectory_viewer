@@ -24,11 +24,7 @@ classdef rbt_parser < handle
             addlistener(robot, 'Deleting', @(~, ~)delete(obj));
             obj.responce_buffer = uint8(zeros(obj.max_datagram_length, 1));
             obj.responce_buffer(1:3) = [204 1 2];
-            parser = inputParser;
-            parser.KeepUnmatched = true;
-            parse(parser, varargin{:});
-            cat_params = parse_categories(parser.Unmatched, {'udp'});
-            obj.connection = udp_params_parser(cat_params.udp);
+            obj.connection = udp_params_parser(varargin);
             set(obj.connection, 'DatagramReceivedFcn', @(~, event)process(obj, event));
             obj.tx_counter = 0;
             obj.rx_counter = 0;
