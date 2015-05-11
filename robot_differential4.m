@@ -20,6 +20,7 @@ classdef robot_differential4 < robot_differential
         %% controls
         function set_register(obj, index, value)
             switch(index)
+                case 5
                 case 8
                     obj.wheel_left.front.virtualSpeed = ...
                         clamp(value, -obj.robot.maxSpeedValue, obj.robot.maxSpeedValue);

@@ -1,4 +1,10 @@
 function u = udp_params_parser(params_struct)
+    if iscell(params_struct)
+        for i = 1:2:length(params_struct)
+            params_struct{i} = lower(params_struct{i});
+        end
+        params_struct = struct(params_struct{:});
+    end
     if isfield(params_struct, 'remotehost')
         rhost = params_struct.remotehost;
         params_struct = rmfield(params_struct, 'remotehost');

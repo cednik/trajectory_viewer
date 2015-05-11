@@ -5,11 +5,11 @@ clear classes;
 
 %% settings
 
-robot_definition = select_robot('sixwheel'); % FektBot / Orpheus / SixWheel
+robot_definition = select_robot('Orpheus'); % FektBot / Orpheus / SixWheel
 
 max_integration_loop_freq = 100; % Hz (1000 Hz is maximum)
 
-gps_update_rate = 20; % Hz
+gps_update_rate = 50; % Hz
 
 viewer_fps = 10;
 
@@ -26,8 +26,8 @@ gps_time_UTC_offset = -2; % not needed if MATLAB version R2014b or newer (left t
 % specifies correction added to local time to get UTC. (-2 hours for CEST)
 
 remote_ip = '127.0.0.1';
-robot_remote_port = 10005;
-robot_local_port = 10006;
+robot_remote_port = 10006;
+robot_local_port = 10005;
 gps_remote_port = 11000;
 gps_local_port = 11001;
 
@@ -55,8 +55,8 @@ robot = eval([robot_definition.model, ...
 % simple call: robot = robot_differential(FektBot, ...);
 
 cmd_parser = rbt_parser(robot, ...
-    'udp:RemoteHost', remote_ip, 'udp:RemotePort', robot_remote_port, ...
-    'udp:LocalPort', robot_local_port, 'udp:forcepnet', force_pnet);
+    'RemoteHost', remote_ip, 'RemotePort', robot_remote_port, ...
+    'LocalPort', robot_local_port, 'forcepnet', force_pnet);
 
 gps = gps_emulator(robot, 'fps', gps_update_rate, 'HomeCoordinates', gps_home_coordinates, ...
     'UTCoffset', gps_time_UTC_offset, 'udp:RemoteHost', remote_ip, ...

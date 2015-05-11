@@ -117,6 +117,7 @@ classdef gps_emulator < handle
     methods (Access = private, Hidden = true)
         function process(obj)
             t = obj.get_utc_time();
+            t = t(1:end-1);
             coor = obj.robot.position;
             [lat, lon] = geodreckon(obj.home_coor(1), obj.home_coor(2), ...
                 pdist([0 0; coor(1:2)]), rad2deg(mod(2.5*pi-atan2(coor(2), coor(1)), 2*pi)));
